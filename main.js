@@ -1,0 +1,334 @@
+document.addEventListener("DOMContentLoaded", function () {
+    require([
+        "esri/Map",
+        "esri/views/SceneView",
+        "esri/layers/FeatureLayer",
+        "esri/Ground",
+        "esri/layers/ElevationLayer",
+        "esri/widgets/Home",
+        "esri/widgets/BasemapGallery",
+        "esri/widgets/Expand",
+        "esri/widgets/Legend"
+    ], function (Map, SceneView, FeatureLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend) {
+
+        // ===================================================================================
+        // 1. CENTRÁLNÍ KONFIGURACE METOD
+        // ===================================================================================
+        const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div><hr>`;
+        
+        const visualizationMethods = {
+            horizontal: {
+                title: "Horizontal Planes",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_horizontal/FeatureServer/0",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Height (Elevation)</h2><label for="planeHeightInput">Height Above Ground (m):</label><input type="number" id="planeHeightInput" value="300000" step="10000">`,
+                createRenderer: (uiValues) => ({ type: "simple", symbol: { type: "polygon-3d", symbolLayers: [{ type: "fill", material: { color: "white", colorMixMode: "replace" } }] }, visualVariables: [{ type: "color", field: "Temperature", stops: uiValues.colorStops }] }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            },
+            point_cloud: {
+                title: "Point Cloud",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_point_cloud_irregular2/FeatureServer",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Point Size</h2><label for="sizeInput">Size (m):</label><input type="number" id="sizeInput" value="40000" min="0" step="1000"><hr><h2>Height (Elevation)</h2><label for="minZOffsetInput">Min Z Offset (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Max Z Offset (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Shape</h2><select id="shapeSelect"><option value="sphere">Sphere</option><option value="cube">Cube</option><option value="diamond">Diamond</option></select>`,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: { type: "point-3d", symbolLayers: [{ type: "object", resource: { primitive: uiValues.shape }, width: uiValues.size, depth: uiValues.size, height: uiValues.size, material: { color: "white", colorMixMode: "replace" } }] },
+                    visualVariables: [{ type: "color", field: "Temperature", stops: uiValues.colorStops }]
+                }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", featureExpressionInfo: { expression: `var t = ($feature.Temperature - 265) / (289 - 265); return ${uiValues.minZ} + t*(${uiValues.maxZ} - ${uiValues.minZ});` } }; }
+            },
+            "3D_surface": {
+                 title: "3D Surface", isSpecialCase: true,
+                 createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01">`
+            },
+            vertical: {
+                title: "Vertical Planes",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_vertical/FeatureServer/1",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: { type: "line-3d", symbolLayers: [{ type: "path", profile: "quad", material: { color: "white", colorMixMode: "replace" } }] },
+                    visualVariables: [
+                        { type: "color", field: "Temperature", stops: uiValues.colorStops },
+                        { type: "size", field: "Temperature", axis: "height", stops: [{ value: 265, size: uiValues.minZ }, { value: 289, size: uiValues.maxZ }] },
+                        { type: "size", axis: "width", value: 5000 }
+                    ]
+                }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            },
+            "3D_graduated": {
+                title: "3D Graduated Symbols",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3D_graduated/FeatureServer/0",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Diameter</h2><label for="diameterInput">Diameter (m):</label><input type="number" id="diameterInput" value="80000" step="1000"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="500000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000"><hr><h2>Shape</h2><select id="shapeSelect"><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="inverted-cone">Inverted Cone</option><option value="tetrahedron">Tetrahedron</option></select>`,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: { type: "point-3d", symbolLayers: [{ type: "object", resource: { primitive: uiValues.shape }, width: uiValues.diameter, material: { color: "white", colorMixMode: "replace" } }] },
+                    visualVariables: [
+                        { type: "color", field: "Temperature", stops: uiValues.colorStops },
+                        { type: "size", field: "Temperature", axis: "height", stops: [{ value: 269, size: uiValues.minZ }, { value: 286, size: uiValues.maxZ }] },
+                        { type: "size", axis: "width-and-depth", useSymbolValue: true }
+                    ]
+                }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            },
+            prism: {
+                title: "Prism Map",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_prism/FeatureServer/0",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: { type: "polygon-3d", symbolLayers: [{ type: "extrude", material: { color: "white", colorMixMode: "replace" } }] },
+                    visualVariables: [
+                        { type: "color", field: "Temperature", stops: uiValues.colorStops },
+                        { type: "size", field: "Temperature", stops: [{ value: 265, size: uiValues.minZ }, { value: 289, size: uiValues.maxZ }] }
+                    ]
+                }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            },
+            voxels: {
+                title: "Voxels",
+                layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_voxels/FeatureServer/1",
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: { type: "polygon-3d", symbolLayers: [{ type: "extrude", material: { color: "white", colorMixMode: "replace" } }] },
+                    visualVariables: [
+                        { type: "color", field: "Temperature", stops: uiValues.colorStops },
+                        { type: "size", field: "Temperature", stops: [{ value: 265, size: uiValues.minZ }, { value: 289, size: uiValues.maxZ }] }
+                    ]
+                }),
+                applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            }
+        };
+
+        let activeLayers = [];
+        let focusedLayer = null;
+        
+        const defaultGround = new Ground({ layers: [new ElevationLayer({ url: "//elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer" })] });
+        const map = new Map({ basemap: "topo-vector", ground: defaultGround });
+        const view = new SceneView({ container: "viewDiv", map: map, camera: { position: { latitude: 48, longitude: 15, z: 15000000 }, tilt: 0, heading: -1 }, qualityProfile: "high" });
+        
+        view.ui.padding = { top: 65, bottom: 35 };
+
+        view.ui.add(new Home({ view }), "top-left");
+        view.ui.add(new Expand({ view, content: new BasemapGallery({ view }), expandIconClass: "esri-icon-basemap" }), "top-left");
+        const legendWidget = new Legend({ view });
+        view.ui.add(new Expand({ view: view, content: legendWidget, expandIconClass: "esri-icon-legend" }), "bottom-left");
+
+        const addLayerPanel = document.getElementById("addLayerPanel");
+        const symbologyEditorPanel = document.getElementById("symbologyEditorPanel");
+        const symbologyControlsContainer = document.getElementById("symbology-controls-container");
+        const layerListUl = document.getElementById("layer-list");
+        
+        async function addLayer(methodKey) {
+            const config = visualizationMethods[methodKey];
+            if (!config) return;
+
+            if (methodKey === "3D_surface" && activeLayers.some(l => l.methodKey === "3D_surface")) {
+                console.log("3D Surface layer already exists.");
+                return;
+            }
+
+            let newLayer;
+            if (config.isSpecialCase && methodKey === "3D_surface") {
+                const customElevation = new ElevationLayer({ url: "https://tiles.arcgis.com/tiles/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3Dsurface_proj/ImageServer" });
+                map.ground = new Ground({ layers: [customElevation] });
+                newLayer = new FeatureLayer({ url: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_horizontal/FeatureServer/0", elevationInfo: { mode: "on-the-ground" }, popupTemplate: { title: "Temperature", content: "Value: {Temperature}" } });
+            } else {
+                newLayer = new FeatureLayer({ url: config.layerUrl, outFields: ["*"], popupTemplate: { title: "{NAME}", content: "Temperature: {Temperature}" } });
+            }
+
+            newLayer.methodKey = methodKey;
+            
+            symbologyControlsContainer.innerHTML = config.createUI();
+            newLayer.currentSymbology = getUIValues();
+
+            map.add(newLayer);
+            activeLayers.push(newLayer);
+            await newLayer.load();
+            
+            openSymbologyEditor(newLayer);
+            updateLayerList();
+        }
+
+        function removeLayer(layerId) {
+            const layerToRemove = activeLayers.find(l => l.id === layerId);
+            if (!layerToRemove) return;
+
+            map.remove(layerToRemove);
+            if (layerToRemove.methodKey === "3D_surface") {
+                map.ground = defaultGround;
+            }
+
+            activeLayers = activeLayers.filter(l => l.id !== layerId);
+
+            if (focusedLayer && focusedLayer.id === layerId) {
+                closeSymbologyEditor();
+            }
+            updateLayerList();
+        }
+
+        function openSymbologyEditor(layer) {
+            focusedLayer = layer;
+            if (layer) {
+                const config = visualizationMethods[layer.methodKey];
+                symbologyControlsContainer.innerHTML = config.createUI();
+                
+                addLayerPanel.style.display = "none";
+                symbologyEditorPanel.style.display = "block";
+
+                setTimeout(() => {
+                    updateUIFromValues(layer.currentSymbology);
+                    handleInputChange();
+                    addEventListenersToControls();
+                }, 0);
+            }
+        }
+
+        function closeSymbologyEditor() {
+            focusedLayer = null;
+            symbologyEditorPanel.style.display = "none";
+            addLayerPanel.style.display = "block";
+        }
+
+        function updateLayerList() {
+            if (activeLayers.length === 0) {
+                layerListUl.innerHTML = `<p class="placeholder-text">No active layers.</p>`;
+                return;
+            }
+            layerListUl.innerHTML = "";
+            [...activeLayers].reverse().forEach(layer => {
+                const config = visualizationMethods[layer.methodKey];
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    <span>${config.title}</span>
+                    <div class="layer-controls">
+                        <button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>
+                        <button class="remove-layer-btn esri-icon-trash" data-layer-id="${layer.id}" title="Remove Layer"></button>
+                    </div>
+                `;
+                layerListUl.appendChild(li);
+            });
+        }
+        
+        function updateUIFromValues(values) {
+            if (!values) return;
+            
+            const setInputValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el && value !== null) el.value = value;
+            };
+
+            setInputValue("startColorPicker", values.colorStops[0].color);
+            setInputValue("middleColorPicker", values.colorStops[1].color);
+            setInputValue("endColorPicker", values.colorStops[2].color);
+            setInputValue("transparencyInput", values.opacity);
+            setInputValue("planeHeightInput", values.height);
+            setInputValue("sizeInput", values.size);
+            setInputValue("minZOffsetInput", values.minZ);
+            setInputValue("maxZOffsetInput", values.maxZ);
+            setInputValue("shapeSelect", values.shape);
+            setInputValue("diameterInput", values.diameter);
+            setInputValue("heightAboveGroundInput", values.height);
+        }
+
+        function getUIValues() {
+            const getValue = (id, isFloat = false, defaultValue = null) => {
+                const input = document.getElementById(id); if (!input) return defaultValue;
+                const val = isFloat ? parseFloat(input.value) : parseInt(input.value);
+                return isNaN(val) ? defaultValue : val;
+            };
+            const getString = (id, defaultValue = null) => document.getElementById(id)?.value || defaultValue;
+
+            const tempMin = (focusedLayer?.methodKey === "3D_graduated") ? 269 : 265;
+            const tempMax = (focusedLayer?.methodKey === "3D_graduated") ? 286 : 289;
+            const tempMid = (tempMin + tempMax) / 2;
+
+            return {
+                colorStops: [ { value: tempMin, color: getString("startColorPicker", "#4575b4") }, { value: tempMid, color: getString("middleColorPicker", "#ffffbf") }, { value: tempMax, color: getString("endColorPicker", "#d73027") } ],
+                opacity: getValue("transparencyInput", true, 1),
+                height: getValue("heightAboveGroundInput") ?? getValue("planeHeightInput") ?? 0,
+                minZ: getValue("minZOffsetInput") ?? 0,
+                maxZ: getValue("maxZOffsetInput") ?? 0,
+                size: getValue("sizeInput"),
+                diameter: getValue("diameterInput"),
+                shape: getString("shapeSelect"),
+            };
+        }
+
+        function applySymbology() {
+            if (!focusedLayer) return;
+            
+            const config = visualizationMethods[focusedLayer.methodKey];
+            const uiValues = getUIValues();
+
+            focusedLayer.currentSymbology = uiValues;
+
+            if(config.createRenderer) focusedLayer.renderer = config.createRenderer(uiValues);
+            if(config.applyProperties) config.applyProperties(focusedLayer, uiValues);
+            
+            if(focusedLayer.methodKey === "3D_surface") {
+                focusedLayer.renderer = { 
+                    type: "simple", 
+                    symbol: { type: "simple-fill", material: { color: "white", colorMixMode: "replace"}, outline: null }, 
+                    visualVariables: [{ type: "color", field: "Temperature", stops: uiValues.colorStops }] 
+                };
+                focusedLayer.opacity = uiValues.opacity;
+            }
+        }
+        
+        function handleInputChange() {
+            const colorRampPreview = document.getElementById("colorRampPreview");
+            if (colorRampPreview) {
+                const uiValues = getUIValues();
+                const colors = uiValues.colorStops.map(stop => stop.color);
+                colorRampPreview.style.background = `linear-gradient(to right, ${colors.join(", ")})`;
+            }
+            applySymbology();        
+        }
+
+        const debouncedInputChangeHandler = debounce(handleInputChange, 50);
+
+        function addEventListenersToControls() {
+            document.querySelectorAll("#symbology-controls-container input, #symbology-controls-container select").forEach(input => {
+                input.addEventListener("input", debouncedInputChangeHandler);
+            });
+        }
+        
+        document.getElementById("addLayerBtn").addEventListener("click", () => {
+            const selectedMethod = document.getElementById("layerSelect").value;
+            addLayer(selectedMethod);
+        });
+
+        document.getElementById("closeSymbologyBtn").addEventListener("click", closeSymbologyEditor);
+
+        layerListUl.addEventListener("click", (event) => {
+            const button = event.target.closest("button");
+            if (!button) return;
+
+            const layerId = button.dataset.layerId;
+            const layer = activeLayers.find(l => l.id === layerId);
+
+            if (button.classList.contains("remove-layer-btn")) {
+                removeLayer(layerId);
+            } else if (button.classList.contains("edit-symbology-btn")) {
+                openSymbologyEditor(layer);
+            }
+        });
+
+        document.getElementById("home-link").addEventListener("click", (e) => { e.preventDefault(); location.reload(); });
+        const helpButton = document.getElementById("helpButton");
+        const helpOverlay = document.getElementById("helpModalOverlay");
+        const closeHelpModalBtn = document.getElementById("closeHelpModal");
+        helpButton.addEventListener("click", () => helpOverlay.style.display = "flex");
+        closeHelpModalBtn.addEventListener("click", () => helpOverlay.style.display = "none");
+        helpOverlay.addEventListener("click", (e) => { if (e.target === helpOverlay) helpOverlay.style.display = "none"; });
+        
+        function debounce(fn, d = 100) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), d); }; }
+
+        view.when(async () => {
+            updateLayerList();
+            try {
+                await view.goTo({ position: { latitude: 48, longitude: 15, z: 6000000 }, tilt: 0, heading: -1 }, { duration: 5000 });
+            } catch (e) {}
+        });
+    });
+});

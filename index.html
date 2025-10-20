@@ -1,0 +1,69 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>3D-Geo-Vis 2.0</title>
+    
+    <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/dark/main.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="icon" href="favicon.png" type="image/png">
+    
+    <script src="https://js.arcgis.com/4.29/"></script>
+</head>
+<body>
+    <div id="headerBar">
+        <a href="#" id="home-link" class="header-app-title">3D-Geo-Vis 2.0</a>
+        <div class="header-right-controls">
+            <button id="helpButton" class="header-button esri-icon-question" title="Help"></button>
+        </div>
+    </div>
+
+    <div id="viewDiv"></div>
+
+    <div id="addLayerPanel" class="panel">
+        <h3>Add Layer</h3>
+        <select id="layerSelect">
+            <option value="horizontal">Horizontal Planes</option>
+            <option value="point_cloud">Point Cloud</option>
+            <option value="3D_surface">3D Surface</option>
+            <option value="vertical">Vertical Planes</option>
+            <option value="3D_graduated">3D Graduated Symbols</option>
+            <option value="prism">Prism Map</option>
+            <option value="voxels">Voxels</option>
+        </select>
+        <button id="addLayerBtn">Add to Map</button>
+    </div>
+
+    <div id="symbologyEditorPanel" class="panel" style="display: none;">
+        <h3 id="symbologyPanelTitle">Symbology</h3>
+        <div id="symbology-controls-container"></div>
+        <button id="closeSymbologyBtn">Done</button>
+    </div>
+
+    <div id="layerListPanel" class="panel">
+        <h3>Active Layers</h3>
+        <ul id="layer-list">
+            <p class="placeholder-text">No active layers.</p>
+        </ul>
+    </div>
+
+    <div id="helpModalOverlay" class="modal-overlay">
+        <div id="helpModal" class="help-modal">
+            <button id="closeHelpModal" class="close-button">&times;</button>
+            <h3>Controls</h3>
+            <p><strong>Pan:</strong> Click and drag the left mouse button.</p>
+            <p><strong>Tilt / Rotate:</strong> Click and drag the right mouse button.</p>
+            <p><strong>Zoom:</strong> Scroll the mouse wheel, or use the <code>+</code>/<code>-</code> buttons.</p>
+            <p><strong>Symbology Panel:</strong> Use the "Add Layer" panel to add visualizations. Then, edit each layer using the Edit icon in the "Active Layers" list.</p>
+            <hr> 
+            <p style="color:grey"><b>Author:</b> Jakub Žejdlík (jakub.zejdlik@upol.cz)</p>
+            <p style="color:grey">Department of Geoinformatics, Palacký University Olomouc</p>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
