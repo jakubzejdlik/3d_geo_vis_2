@@ -12,18 +12,23 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/smartMapping/statistics/summaryStatistics"
     ], function (Map, SceneView, FeatureLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics) {
 
-        const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div><hr>`;
+        // ZMÌNA: Odebráno <hr> z konce øetìzce
+        const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div>`;
         
         const visualizationMethods = {
             horizontal: {
-                title: "Horizontal Planes", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_horizontal/FeatureServer/0",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Height (Elevation)</h2><label for="planeHeightInput">Height Above Ground (m):</label><input type="number" id="planeHeightInput" value="300000" step="10000">`,
+                title: "Horizontal Planes",
+                compatibleGeometry: ["polygon"], 
+                // ZMÌNA: Odebráno <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Height (Elevation)</h2><label for="planeHeightInput">Height Above Ground (m):</label><input type="number" id="planeHeightInput" value="300000" step="10000">`,
                 createRenderer: (uiValues) => ({ type: "simple", symbol: { type: "polygon-3d", symbolLayers: [{ type: "fill", material: { color: "white", colorMixMode: "replace" } }] }, visualVariables: [{ type: "color", field: uiValues.field, stops: uiValues.colorStops }] }),
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
             point_cloud: {
-                title: "Point Cloud", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_point_cloud_irregular2/FeatureServer",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Point Size</h2><label for="sizeInput">Size (m):</label><input type="number" id="sizeInput" value="40000" min="0" step="1000"><hr><h2>Height (Elevation)</h2><label for="minZOffsetInput">Min Z Offset (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Max Z Offset (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Shape</h2><select id="shapeSelect"><option value="sphere">Sphere</option><option value="cube">Cube</option><option value="diamond">Diamond</option></select>`,
+                title: "Point Cloud",
+                compatibleGeometry: ["point"], 
+                // ZMÌNA: Odebrány 3x <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Point Size</h2><label for="sizeInput">Size (m):</label><input type="number" id="sizeInput" value="40000" min="0" step="1000"><h2>Height (Elevation)</h2><label for="minZOffsetInput">Min Z Offset (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Max Z Offset (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><h2>Shape</h2><select id="shapeSelect"><option value="sphere">Sphere</option><option value="cube">Cube</option><option value="diamond">Diamond</option></select>`,
                 createRenderer: (uiValues) => ({ type: "simple", symbol: { type: "point-3d", symbolLayers: [{ type: "object", resource: { primitive: uiValues.shape }, width: uiValues.size, depth: uiValues.size, height: uiValues.size, material: { color: "white", colorMixMode: "replace" } }] }, visualVariables: [{ type: "color", field: uiValues.field, stops: uiValues.colorStops }] }),
                 applyProperties: (layer, uiValues) => {
                     layer.opacity = uiValues.opacity;
@@ -31,13 +36,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     layer.elevationInfo = { mode: "relative-to-ground", featureExpressionInfo: { expression: `var t = ($feature.${uiValues.field} - ${min}) / (${max} - ${min}); return ${uiValues.minZ} + t*(${uiValues.maxZ} - ${uiValues.minZ});` } };
                 }
             },
-            "3D_surface": {
-                 title: "3D Surface", isSpecialCase: true,
-                 createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01">`
-            },
             vertical: {
-                title: "Vertical Planes", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_vertical/FeatureServer/1",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                title: "Vertical Planes",
+                compatibleGeometry: ["polyline"], 
+                // ZMÌNA: Odebrány 3x <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
                 createRenderer: (uiValues) => ({
                     type: "simple",
                     symbol: { type: "line-3d", symbolLayers: [{ type: "path", profile: "quad", material: { color: "white", colorMixMode: "replace" } }] },
@@ -46,8 +49,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
             "3D_graduated": {
-                title: "3D Graduated Symbols", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3D_graduated/FeatureServer/0",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Diameter</h2><label for="diameterInput">Diameter (m):</label><input type="number" id="diameterInput" value="80000" step="1000"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="500000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000"><hr><h2>Shape</h2><select id="shapeSelect"><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="inverted-cone">Inverted Cone</option><option value="tetrahedron">Tetrahedron</option></select>`,
+                title: "3D Graduated Symbols",
+                compatibleGeometry: ["point"], 
+                // ZMÌNA: Odebrány 4x <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Diameter</h2><label for="diameterInput">Diameter (m):</label><input type="number" id="diameterInput" value="80000" step="1000"><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="500000" step="1000"><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000"><h2>Shape</h2><select id="shapeSelect"><option value="cylinder">Cylinder</option><option value="cone">Cone</option><option value="inverted-cone">Inverted Cone</option><option value="tetrahedron">Tetrahedron</option></select>`,
                 createRenderer: (uiValues) => ({
                     type: "simple",
                     symbol: { type: "point-3d", symbolLayers: [{ type: "object", resource: { primitive: uiValues.shape }, width: uiValues.diameter, material: { color: "white", colorMixMode: "replace" } }] },
@@ -56,8 +61,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
             prism: {
-                title: "Prism Map", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_prism/FeatureServer/0",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                title: "Prism Map",
+                compatibleGeometry: ["polygon"], 
+                // ZMÌNA: Odebrány 3x <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
                 createRenderer: (uiValues) => ({
                     type: "simple",
                     symbol: { type: "polygon-3d", symbolLayers: [{ type: "extrude", material: { color: "white", colorMixMode: "replace" } }] },
@@ -66,8 +73,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
             voxels: {
-                title: "Voxels", layerUrl: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_voxels/FeatureServer/1",
-                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><hr><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><hr><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
+                title: "Voxels",
+                compatibleGeometry: ["polygon"], 
+                // ZMÌNA: Odebrány 3x <hr>
+                createUI: () => `${commonColorUI}<h2>Transparency</h2><input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01"><h2>Extrusion</h2><label for="minZOffsetInput">Base Height (m):</label><input type="number" id="minZOffsetInput" value="0" step="1000"><br><label for="maxZOffsetInput">Extrusion (m):</label><input type="number" id="maxZOffsetInput" value="200000" step="1000"><h2>Height (Elevation)</h2><label for="heightAboveGroundInput">Height Above Ground (m):</label><input type="number" id="heightAboveGroundInput" value="0" step="1000">`,
                 createRenderer: (uiValues) => ({
                     type: "simple",
                     symbol: { type: "polygon-3d", symbolLayers: [{ type: "extrude", material: { color: "white", colorMixMode: "replace" } }] },
@@ -79,6 +88,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         let activeLayers = [];
         let focusedLayer = null;
+        let pendingLayer = null; 
         
         const defaultGround = new Ground({ layers: [new ElevationLayer({ url: "//elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer" })] });
         const map = new Map({ basemap: "topo-vector", ground: defaultGround });
@@ -90,82 +100,158 @@ document.addEventListener("DOMContentLoaded", function () {
         view.ui.add(new Expand({ view, content: new BasemapGallery({ view }), expandIconClass: "esri-icon-basemap" }), "top-left");
         view.ui.add(new Expand({ view: view, content: new Legend({ view }), expandIconClass: "esri-icon-legend" }), "bottom-left");
 
+        // Reference na panely
         const addLayerPanel = document.getElementById("addLayerPanel");
+        const methodSelectionPanel = document.getElementById("methodSelectionPanel");
         const symbologyEditorPanel = document.getElementById("symbologyEditorPanel");
-        const symbologyControlsContainer = document.getElementById("symbology-controls-container");
-        const symbologyPanelTitle = document.getElementById("symbologyPanelTitle");
         const layerListUl = document.getElementById("layer-list");
         
-        async function addLayer(methodKey) {
-            const config = visualizationMethods[methodKey];
-            if (!config) return;
+        // Reference na ovládací prvky
+        const layerUrlInput = document.getElementById("layerUrlInput");
+        const loadLayerBtn = document.getElementById("loadLayerBtn");
+        const loadingMessage = document.getElementById("loadingMessage");
+        const methodButtonsContainer = document.getElementById("method-buttons-container");
+        const cancelMethodBtn = document.getElementById("cancelMethodBtn");
+        const symbologyControlsContainer = document.getElementById("symbology-controls-container");
+        const symbologyPanelTitle = document.getElementById("symbologyPanelTitle");
+        
+        // ===== LOGIKA PRO NAÈTENÍ VRSTVY =====
 
-            if (methodKey === "3D_surface" && activeLayers.some(l => l.methodKey === "3D_surface")) { return; }
-
-            let newLayer;
-            
-            let dynamicPopupTemplate = { 
-                title: config.title 
-            }; 
-
-            if (config.isSpecialCase && methodKey === "3D_surface") {
-                const customElevation = new ElevationLayer({ url: "https://tiles.arcgis.com/tiles/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3Dsurface_proj/ImageServer" });
-                map.ground = new Ground({ layers: [customElevation] });
-                newLayer = new FeatureLayer({ 
-                    url: "https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_horizontal/FeatureServer/0", 
-                    elevationInfo: { mode: "on-the-ground" }, 
-                });
-            } else {
-                newLayer = new FeatureLayer({ 
-                    url: config.layerUrl, 
-                    outFields: ["*"], 
-                });
+        async function handleLoadLayer() {
+            const url = layerUrlInput.value;
+            if (!url) {
+                alert("Please enter a Feature Layer URL.");
+                return;
             }
 
-            newLayer.methodKey = methodKey;
-            
-            map.add(newLayer);
-            activeLayers.push(newLayer);
-            
-            await newLayer.load(); 
+            loadingMessage.style.display = "block";
+            loadLayerBtn.disabled = true;
+            pendingLayer = null; 
 
-            const allFieldInfos = newLayer.fields
-                .filter(field => field.type !== "oid" && field.type !== "global-id" && field.type !== "geometry") // Vynecháme systémová pole
+            try {
+                pendingLayer = new FeatureLayer({
+                    url: url,
+                    outFields: ["*"] 
+                });
+
+                await pendingLayer.load();
+                
+                if (!pendingLayer.title) {
+                    pendingLayer.title = "New Layer";
+                }
+                
+                const geomType = pendingLayer.geometryType; 
+                showMethodSelection(geomType);
+
+            } catch (error) {
+                console.error("Failed to load layer:", error);
+                alert("Could not load layer. Please check the URL and ensure it is a valid ArcGIS Feature Layer.");
+                pendingLayer = null;
+            } finally {
+                loadingMessage.style.display = "none";
+                loadLayerBtn.disabled = false;
+            }
+        }
+
+        function showMethodSelection(geometryType) {
+            methodButtonsContainer.innerHTML = ""; 
+            
+            const compatibleMethods = Object.keys(visualizationMethods).filter(key => {
+                const config = visualizationMethods[key];
+                return config.compatibleGeometry.includes(geometryType);
+            });
+
+            if (compatibleMethods.length === 0) {
+                alert(`No compatible visualization methods found for this geometry type (${geometryType}).`);
+                pendingLayer = null;
+                return;
+            }
+
+            compatibleMethods.forEach(key => {
+                const config = visualizationMethods[key];
+                const btn = document.createElement("button");
+                btn.className = "method-btn";
+                btn.innerText = config.title;
+                btn.onclick = () => finalizeAddLayer(key);
+                methodButtonsContainer.appendChild(btn);
+            });
+
+            addLayerPanel.style.display = "none";
+            methodSelectionPanel.style.display = "block";
+        }
+
+        async function finalizeAddLayer(methodKey) {
+            if (!pendingLayer) return;
+
+            const layer = pendingLayer;
+            pendingLayer = null; 
+
+            const config = visualizationMethods[methodKey];
+            
+            const allFieldInfos = layer.fields
+                .filter(field => field.type !== "oid" && field.type !== "global-id" && field.type !== "geometry")
                 .map(field => ({
                     fieldName: field.name,
                     label: field.alias || field.name
                 }));
-
-            dynamicPopupTemplate.content = [{
-                type: "fields",
-                fieldInfos: allFieldInfos
-            }];
-
-            newLayer.popupTemplate = dynamicPopupTemplate;
             
+            layer.popupTemplate = {
+                title: config.title, 
+                content: [{ type: "fields", fieldInfos: allFieldInfos }]
+            };
 
-            const numericFields = newLayer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
-            const defaultField = numericFields.includes("Temperature") ? "Temperature" : numericFields[0];
+            layer.methodKey = methodKey;
+            map.add(layer);
+            activeLayers.push(layer);
+
+            const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
+            const defaultField = numericFields.length > 0 ? numericFields[0] : null;
+
+            if (defaultField) {
+                const stats = await summaryStatistics({ layer, field: defaultField });
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = config.createUI();
+                layer.currentSymbology = getUIValues(tempDiv, defaultField, stats);
+                layer.currentSymbology.labelField = "__none__";
+                applySymbology(layer); 
+            } else {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = config.createUI();
+                layer.currentSymbology = getUIValues(tempDiv, null, {min: 0, max: 0, avg: 0});
+                layer.currentSymbology.labelField = "__none__";
+            }
             
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = config.createUI();
-            newLayer.currentSymbology = getUIValues(tempDiv, defaultField, {min: 0, max: 0}); 
-            newLayer.currentSymbology.labelField = "__none__"; 
-            
-            openSymbologyEditor(newLayer); 
+            // ===== NOVÉ: ZOOM NA VRSTVU =====
+            try {
+                // Poèkáme, až bude vrstva pøipravena ve view
+                await view.whenLayerView(layer);
+                // Pøesuneme kameru na plný rozsah vrstvy s animací 1.5 sekundy
+                view.goTo(layer.fullExtent, { duration: 1500 });
+            } catch (e) {
+                console.error("Failed to zoom to layer extent:", e);
+                // Pokraèujeme dál, i kdyby zoom selhal
+            }
+            // ===== KONEC ZOOMU NA VRSTVU =====
+
+            openSymbologyEditor(layer);
             updateLayerList();
+            methodSelectionPanel.style.display = "none";
         }
+
+        function cancelMethodSelection() {
+            pendingLayer = null; 
+            methodSelectionPanel.style.display = "none";
+            addLayerPanel.style.display = "block";
+        }
+
+        // ===== KONEC LOGIKY NAÈTENÍ VRSTVY =====
+
 
         function removeLayer(layerId) {
             const layerToRemove = activeLayers.find(l => l.id === layerId);
             if (!layerToRemove) return;
-
             map.remove(layerToRemove);
-            if (layerToRemove.methodKey === "3D_surface") {
-                map.ground = defaultGround;
-            }
             activeLayers = activeLayers.filter(l => l.id !== layerId);
-
             if (focusedLayer && focusedLayer.id === layerId) {
                 closeSymbologyEditor();
             }
@@ -179,37 +265,54 @@ document.addEventListener("DOMContentLoaded", function () {
             const config = visualizationMethods[layer.methodKey];
             symbologyPanelTitle.innerText = `Symbology (${config.title})`;
             
-            // Seznam pro VIZUALIZACI (èíselné atributy)
-            const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
-            let attributeSelectorHTML = `<h2>Attribute to Visualize</h2><select id="attributeSelect">`;
-            numericFields.forEach(field => {
-                attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
-            });
-            attributeSelectorHTML += `</select><hr>`;
+            // ZMÌNA: Odebráno <hr>
+            let renameHTML = `<h2>Layer Name</h2><input type="text" id="layerNameInput">`;
 
-            // Seznam pro POPISKY (všechny textové/obecné atributy)
+            // ZMÌNA: Odebráno <hr>
+            const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
+            let attributeSelectorHTML = `<h2>Attribute to Visualize</h2>`;
+            if (numericFields.length > 0) {
+                attributeSelectorHTML += `<select id="attributeSelect">`;
+                numericFields.forEach(field => {
+                    attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
+                });
+                attributeSelectorHTML += `</select>`;
+            } else {
+                attributeSelectorHTML += `<p style="color: var(--text-muted); font-size: 13px;">No numeric fields found in this layer.</p>`;
+            }
+
+            // ZMÌNA: Odebráno <hr>
             const allFields = layer.fields.filter(f => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry");
             let labelingSelectorHTML = `<h2>Labels</h2><select id="labelAttributeSelect">`;
             labelingSelectorHTML += `<option value="__none__">-- No Labels --</option>`;
             allFields.forEach(field => {
                 labelingSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
             });
-            labelingSelectorHTML += `</select><hr>`;
+            labelingSelectorHTML += `</select>`;
 
             // Sestavení UI panelu
-            symbologyControlsContainer.innerHTML = attributeSelectorHTML + labelingSelectorHTML + config.createUI();
+            symbologyControlsContainer.innerHTML = renameHTML + attributeSelectorHTML + labelingSelectorHTML + config.createUI();
+            
+            const layerNameInput = document.getElementById("layerNameInput");
+            if (layerNameInput) {
+                layerNameInput.value = layer.title || "Untitled Layer";
+            }
             
             addLayerPanel.style.display = "none";
+            methodSelectionPanel.style.display = "none";
             symbologyEditorPanel.style.display = "block";
             
             const attributeSelect = document.getElementById("attributeSelect");
-            attributeSelect.value = layer.currentSymbology.field;
+            if (attributeSelect) {
+                attributeSelect.value = layer.currentSymbology.field;
+            }
 
-            await updateStatsAndSymbology(); 
+            if (attributeSelect) {
+                await updateStatsAndSymbology(); 
+            }
             
             addEventListenersToControls();
 
-            // Nastavíme aktuální hodnotu v novém dropdownu
             const labelAttributeSelect = document.getElementById("labelAttributeSelect");
             if (labelAttributeSelect && layer.currentSymbology.labelField) {
                 labelAttributeSelect.value = layer.currentSymbology.labelField;
@@ -233,8 +336,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 const li = document.createElement("li");
                 const visibilityIcon = layer.visible ? "esri-icon-visible" : "esri-icon-non-visible";
                 const visibilityTitle = layer.visible ? "Hide Layer" : "Show Layer";
+                
                 li.innerHTML = `
-                    <span>${config.title}</span>
+                    <span title="${layer.title || 'Layer'} (${config.title})">
+                        ${layer.title || 'Layer'} <span class="method-name">(${config.title})</span>
+                    </span>
                     <div class="layer-controls">
                         <button class="toggle-visibility-btn ${visibilityIcon}" data-layer-id="${layer.id}" title="${visibilityTitle}"></button>
                         <button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>
@@ -281,8 +387,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const finalStats = stats || focusedLayer?.currentSymbology.stats || { min: 0, max: 0, avg: 0 };
             
+            const attributeSelect = document.getElementById("attributeSelect");
+
             return {
-                field: field || document.getElementById("attributeSelect")?.value,
+                field: field || (attributeSelect ? attributeSelect.value : null), 
                 labelField: getString("labelAttributeSelect", "__none__"), 
                 stats: finalStats,
                 rawColors: { start: startColor, middle: middleColor, end: endColor },
@@ -300,7 +408,13 @@ document.addEventListener("DOMContentLoaded", function () {
         async function updateStatsAndSymbology() {
             if (!focusedLayer) return;
 
-            const selectedField = document.getElementById("attributeSelect").value;
+            const attributeSelect = document.getElementById("attributeSelect");
+            if (!attributeSelect) { 
+                handleInputChange();
+                return;
+            }
+
+            const selectedField = attributeSelect.value;
             
             const stats = await summaryStatistics({ layer: focusedLayer, field: selectedField });
             
@@ -328,31 +442,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 layerToApply.currentSymbology = uiValues;
             }
 
-            if(config.createRenderer) layerToApply.renderer = config.createRenderer(uiValues);
+            if (uiValues.field) {
+                 if(config.createRenderer) layerToApply.renderer = config.createRenderer(uiValues);
+            }
+           
             if(config.applyProperties) config.applyProperties(layerToApply, uiValues);
             
-            if(layerToApply.methodKey === "3D_surface") {
-                layerToApply.renderer = { 
-                    type: "simple", 
-                    symbol: { type: "simple-fill", material: { color: "white", colorMixMode: "replace"}, outline: null }, 
-                    visualVariables: [{ type: "color", field: uiValues.field, stops: uiValues.colorStops }] 
-                };
-                layerToApply.opacity = uiValues.opacity;
-            }
-            
-            // NOVÉ: Aplikace nastavení popiskù s formátováním
             if (uiValues.labelField && uiValues.labelField !== "__none__") {
-                
-                // Zjistíme typ pole, abychom vìdìli, zda formátovat èíslo
                 const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
-                const fieldType = field ? field.type : "string"; // Výchozí je string
+                const fieldType = field ? field.type : "string"; 
                 
                 let labelExpression;
                 if (["double", "integer", "single", "small-integer"].includes(fieldType)) {
-                    // Je to èíslo, použijeme Arcade formátování
                     labelExpression = `Text($feature.${uiValues.labelField}, '#,###')`;
                 } else {
-                    // Je to text nebo datum, necháme ho tak, jak je
                     labelExpression = `$feature.${uiValues.labelField}`;
                 }
 
@@ -362,18 +465,26 @@ document.addEventListener("DOMContentLoaded", function () {
                         type: "label-3d",
                         symbolLayers: [{
                             type: "text",
-                            material: { color: "#E0E0E0" }, // Barva textu (z vaší CSS)
-                            halo: { color: [0, 0, 0, 0.7], size: 1 }, // Tmavé halo
+                            material: { color: "#E0E0E0" },
+                            halo: { color: [0, 0, 0, 0.7], size: 1 },
                             font: { size: 10, family: "Open Sans" },
                         }]
                     }
                 }];
             } else {
-                // Pokud je vybráno "No Labels", popisky vypneme
                 layerToApply.labelingInfo = null; 
             }
         }
         
+        function handleLayerNameChange() {
+            if (!focusedLayer) return;
+            const nameInput = document.getElementById("layerNameInput");
+            if (nameInput) {
+                focusedLayer.title = nameInput.value || "Untitled Layer";
+                updateLayerList(); 
+            }
+        }
+
         function handleInputChange() {
             updatePreviewFromInputs();
             applySymbology();        
@@ -389,9 +500,15 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const debouncedInputChangeHandler = debounce(handleInputChange, 50);
+        const debouncedNameChangeHandler = debounce(handleLayerNameChange, 250); 
 
         function addEventListenersToControls() {
-            document.querySelectorAll('#symbology-controls-container input').forEach(input => {
+            const layerNameInput = document.getElementById("layerNameInput");
+            if (layerNameInput) {
+                layerNameInput.addEventListener("input", debouncedNameChangeHandler);
+            }
+
+            document.querySelectorAll('#symbology-controls-container input:not(#layerNameInput)').forEach(input => {
                 input.addEventListener("input", debouncedInputChangeHandler);
             });
             
@@ -399,16 +516,18 @@ document.addEventListener("DOMContentLoaded", function () {
                  select.addEventListener("change", handleInputChange);
             });
 
-            document.getElementById("attributeSelect").addEventListener("change", updateStatsAndSymbology);
-
-            document.getElementById("labelAttributeSelect").addEventListener("change", handleInputChange);
+            const attributeSelect = document.getElementById("attributeSelect");
+            if (attributeSelect) {
+                attributeSelect.addEventListener("change", updateStatsAndSymbology);
+            }
+            const labelAttributeSelect = document.getElementById("labelAttributeSelect");
+            if (labelAttributeSelect) {
+                labelAttributeSelect.addEventListener("change", handleInputChange); 
+            }
         }
         
-        document.getElementById("addLayerBtn").addEventListener("click", () => {
-            const selectedMethod = document.getElementById("layerSelect").value;
-            addLayer(selectedMethod);
-        });
-
+        loadLayerBtn.addEventListener("click", handleLoadLayer);
+        cancelMethodBtn.addEventListener("click", cancelMethodSelection);
         document.getElementById("closeSymbologyBtn").addEventListener("click", closeSymbologyEditor);
 
         layerListUl.addEventListener("click", (event) => {

@@ -25,16 +25,22 @@
 
     <div id="addLayerPanel" class="panel">
         <h3>Add Layer</h3>
-        <select id="layerSelect">
-            <option value="horizontal">Horizontal Planes</option>
-            <option value="point_cloud">Point Cloud</option>
-            <option value="3D_surface">3D Surface</option>
-            <option value="vertical">Vertical Planes</option>
-            <option value="3D_graduated">3D Graduated Symbols</option>
-            <option value="prism">Prism Map</option>
-            <option value="voxels">Voxels</option>
-        </select>
-        <button id="addLayerBtn">Add to Map</button>
+        <label for="layerUrlInput">Feature Layer URL:</label>
+        <input type="text" id="layerUrlInput" placeholder="https://...">
+        <button id="loadLayerBtn">Load Layer</button>
+        <div id="loadingMessage" style="display: none; color: var(--text-muted); margin-top: 10px; text-align: center;">
+            Loading layer...
+        </div>
+    </div>
+
+    <div id="methodSelectionPanel" class="panel" style="display: none;">
+        <h3>Select Visualization</h3>
+        <p id="method-selection-prompt" style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">
+            Loaded layer. Please select a visualization method:
+        </p>
+        <div id="method-buttons-container">
+            </div>
+        <button id="cancelMethodBtn" class="secondary-btn">Cancel</button>
     </div>
 
     <div id="symbologyEditorPanel" class="panel" style="display: none;">
