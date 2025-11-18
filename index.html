@@ -17,6 +17,10 @@
     <div id="headerBar">
         <a href="#" id="home-link" class="header-app-title">3D-Geo-Vis 2.0</a>
         <div class="header-right-controls">
+            <button id="addThematicLayerBtn" class="header-button esri-icon-plus-circled" title="Add Thematic Layer"></button>
+            <button id="addBuildingsBtn" class="header-button esri-icon-urban-model" title="Add 3D Buildings"></button>
+            <button id="changeElevationBtn" class="header-button esri-icon-elevation-profile" title="Change Elevation Layer"></button>
+
             <button id="helpButton" class="header-button esri-icon-question" title="Help"></button>
         </div>
     </div>
@@ -24,12 +28,33 @@
     <div id="viewDiv"></div>
 
     <div id="addLayerPanel" class="panel">
-        <h3>Add Layer</h3>
+        <h3>Add Thematic Layer</h3>
         <label for="layerUrlInput">Feature Layer URL:</label>
         <input type="text" id="layerUrlInput" placeholder="https://...">
         <button id="loadLayerBtn">Load Layer</button>
         <div id="loadingMessage" style="display: none; color: var(--text-muted); margin-top: 10px; text-align: center;">
             Loading layer...
+        </div>
+    </div>
+    
+    <div id="elevationPanel" class="panel" style="display: none;">
+        <h3>Change Elevation Layer</h3>
+        
+        <div class="elevation-option">
+            <input type="radio" id="defaultElevationRadio" name="elevation-type" value="default" checked>
+            <label for="defaultElevationRadio">Default Elevation</label>
+        </div>
+        
+        <div class="elevation-option">
+            <input type="radio" id="customElevationRadio" name="elevation-type" value="custom">
+            <label for="customElevationRadio">Custom Elevation from URL</label>
+        </div>
+        
+        <input type="text" id="elevationUrlInput" placeholder="https://..." disabled>
+        
+        <button id="applyElevationBtn" class="primary-btn">Apply</button>
+        <div id="elevationLoadingMessage" style="display: none; color: var(--text-muted); margin-top: 10px; text-align: center;">
+            Loading elevation...
         </div>
     </div>
 
@@ -52,22 +77,30 @@
     <div id="layerListPanel" class="panel">
         <h3>Active Layers</h3>
         <ul id="layer-list">
-            <p class="placeholder-text">No active layers.</p>
+            <p class="placeholder-text">Use the buttons in the top bar to add thematic data, add 3D buildings, or change the elevation layer.</p>
         </ul>
     </div>
 
     <div id="helpModalOverlay" class="modal-overlay">
         <div id="helpModal" class="help-modal">
-            <button id="closeHelpModal" class="close-button">&times;</button>
-            <h3>Controls</h3>
-            <p><strong>Pan:</strong> Click and drag the left mouse button.</p>
-            <p><strong>Tilt / Rotate:</strong> Click and drag the right mouse button.</p>
-            <p><strong>Zoom:</strong> Scroll the mouse wheel, or use the <code>+</code>/<code>-</code> buttons.</p>
-            <p><strong>Symbology Panel:</strong> Use the "Add Layer" panel to add visualizations. Then, edit each layer using the Edit icon in the "Active Layers" list.</p>
-            <hr> 
-            <p style="color:grey"><b>Author:</b> Jakub Žejdlík (jakub.zejdlik@upol.cz)</p>
-            <p style="color:grey">Department of Geoinformatics, Palacký University Olomouc</p>
-        </div>
+        <button id="closeHelpModal" class="close-button">&times;</button>
+        <h3>Controls</h3>
+        <p><strong>Pan:</strong> Click and drag the left mouse button.</p>
+        <p><strong>Tilt / Rotate:</strong> Click and drag the right mouse button.</p>
+        <p><strong>Zoom:</strong> Scroll the mouse wheel, or use the <code>+</code>/<code>-</code> buttons.</p>
+        <p><strong>Symbology:</strong> Use the "Add Thematic Layer" button to add data (ArcGIS Online URL). Then, edit the symbology of each layer using the Edit icon in the "Active Layers" list.</p>
+        
+        <hr> 
+        <h3>Demo Data (Click to copy)</h3>
+        <p><strong>Points:</strong> <code id="demo-points" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3D_graduated/FeatureServer/0</code></p>
+        <p><strong>Lines:</strong> <code id="demo-lines" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_vertical/FeatureServer/1</code></p>
+        <p><strong>Polygons:</strong> <code id="demo-polygons" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_prism/FeatureServer/0</code></p>
+        <p><strong>Elevation:</strong> <code id="demo-elevation" title="Click to copy">https://tiles.arcgis.com/tiles/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3Dsurface_proj/ImageServer</code></p>
+        
+        <hr> 
+        <p style="color:grey"><b>Author:</b> Jakub Žejdlík (jakub.zejdlik@upol.cz)</p>
+        <p style="color:grey">Department of Geoinformatics, Palacký University Olomouc</p>
+    </div>
     </div>
 
     <script src="main.js"></script>
