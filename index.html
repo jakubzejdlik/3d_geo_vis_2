@@ -37,6 +37,16 @@
         </div>
     </div>
     
+    <div id="addBuildingsPanel" class="panel" style="display: none;">
+        <h3>Add 3D Buildings</h3>
+        <label for="buildingsUrlInput">Scene Layer URL:</label>
+        <input type="text" id="buildingsUrlInput" placeholder="https://...">
+        <button id="loadBuildingsBtn" class="primary-btn">Load Buildings</button>
+        <div id="buildingsLoadingMessage" style="display: none; color: var(--text-muted); margin-top: 10px; text-align: center;">
+            Loading buildings...
+        </div>
+    </div>
+    
     <div id="elevationPanel" class="panel" style="display: none;">
         <h3>Change Elevation Layer</h3>
         
@@ -95,6 +105,7 @@
         <p><strong>Points:</strong> <code id="demo-points" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3D_graduated/FeatureServer/0</code></p>
         <p><strong>Lines:</strong> <code id="demo-lines" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_vertical/FeatureServer/1</code></p>
         <p><strong>Polygons:</strong> <code id="demo-polygons" title="Click to copy">https://services1.arcgis.com/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_prism/FeatureServer/0</code></p>
+        <p><strong>3D Buildings:</strong> <code id="demo-buildings" title="Click to copy">https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/Building_Rotterdam/SceneServer</code></p>
         <p><strong>Elevation:</strong> <code id="demo-elevation" title="Click to copy">https://tiles.arcgis.com/tiles/AGrMjSBR7fxJYLfU/arcgis/rest/services/EU_3Dsurface_proj/ImageServer</code></p>
         
         <hr> 

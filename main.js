@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/Map",
         "esri/views/SceneView",
         "esri/layers/FeatureLayer",
+        "esri/layers/SceneLayer",
         "esri/Ground",
         "esri/layers/ElevationLayer",
         "esri/widgets/Home",
@@ -11,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/widgets/Legend",
         "esri/smartMapping/statistics/summaryStatistics",
         "esri/Viewpoint"
-    ], function (Map, SceneView, FeatureLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint) {
+    ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint) {
 
         const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div>`;
         
@@ -116,6 +117,45 @@ document.addEventListener("DOMContentLoaded", function () {
                     visualVariables: [ { type: "color", field: uiValues.field, stops: uiValues.colorStops }, { type: "size", field: uiValues.field, stops: [{ value: uiValues.stats.min, size: uiValues.minZ }, { value: uiValues.stats.max, size: uiValues.maxZ }] } ]
                 }),
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
+            },
+            // ===== NOVÁ METODA: 3D Buildings Context =====
+            building_context: {
+                title: "3D Buildings",
+                compatibleGeometry: ["mesh"], // SceneLayers
+                createUI: () => `
+                    <h2>Color</h2>
+                    <input type="color" id="singleColorPicker" value="#ffffff" style="width:100%; height:40px; cursor:pointer;">
+                    
+                    <h2>Transparency</h2>
+                    <input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01">
+                    
+                    <h2>Edges</h2>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="edgesCheckbox">
+                        <label for="edgesCheckbox" style="margin:0; cursor:pointer;">Show Edges</label>
+                    </div>
+                `,
+                createRenderer: (uiValues) => ({
+                    type: "simple",
+                    symbol: {
+                        type: "mesh-3d",
+                        symbolLayers: [{
+                            type: "fill",
+                            material: { 
+                                color: uiValues.singleColor, 
+                                colorMixMode: "replace" // Pøepíše pùvodní textury
+                            },
+                            edges: uiValues.showEdges ? {
+                                type: "solid",
+                                color: [0, 0, 0, 0.6],
+                                size: 1
+                            } : null
+                        }]
+                    }
+                }),
+                applyProperties: (layer, uiValues) => {
+                    layer.opacity = uiValues.opacity;
+                }
             }
         };
 
@@ -126,12 +166,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const defaultGround = new Ground({ layers: [new ElevationLayer({ url: "//elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer" })] });
         const map = new Map({ basemap: "topo-vector", ground: defaultGround });
         
-        // Cíl pro tlaèítko Home (oddáleno)
         const homeButtonViewpoint = new Viewpoint({
             camera: { position: { latitude: 48, longitude: 15, z: 25000000 }, tilt: 0, heading: -1 }
         });
 
-        // Cíl pro úvodní animaci (pøiblíženo)
         const animationTargetViewpoint = new Viewpoint({
             camera: { position: { latitude: 48, longitude: 15, z: 15000000 }, tilt: 0, heading: -1 }
         });
@@ -145,7 +183,6 @@ document.addEventListener("DOMContentLoaded", function () {
         
         view.ui.padding = { top: 65, bottom: 35 };
         
-        // Tlaèítko Home nyní používá oddálený pohled
         view.ui.add(new Home({ view: view, viewpoint: homeButtonViewpoint }), "top-left");
         view.ui.add(new Expand({ view, content: new BasemapGallery({ view }), expandIconClass: "esri-icon-basemap" }), "top-left");
         view.ui.add(new Expand({ view: view, content: new Legend({ view }), expandIconClass: "esri-icon-legend" }), "bottom-left");
@@ -166,7 +203,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const symbologyPanelTitle = document.getElementById("symbologyPanelTitle");
         
         const addThematicLayerBtn = document.getElementById("addThematicLayerBtn");
-
+        
+        // Prvky panelu výškopisu
         const changeElevationBtn = document.getElementById("changeElevationBtn");
         const elevationPanel = document.getElementById("elevationPanel");
         const defaultElevationRadio = document.getElementById("defaultElevationRadio");
@@ -175,7 +213,15 @@ document.addEventListener("DOMContentLoaded", function () {
         const applyElevationBtn = document.getElementById("applyElevationBtn");
         const elevationLoadingMessage = document.getElementById("elevationLoadingMessage");
 
-        // ===== LOGIKA PRO NAÈTENÍ VRSTVY =====
+        // Prvky panelu budov
+        const addBuildingsBtn = document.getElementById("addBuildingsBtn");
+        const addBuildingsPanel = document.getElementById("addBuildingsPanel");
+        const buildingsUrlInput = document.getElementById("buildingsUrlInput");
+        const loadBuildingsBtn = document.getElementById("loadBuildingsBtn");
+        const buildingsLoadingMessage = document.getElementById("buildingsLoadingMessage");
+
+
+        // ===== LOGIKA PRO NAÈTENÍ TEMATICKÉ VRSTVY =====
         async function handleLoadLayer() {
             const url = layerUrlInput.value;
             if (!url) {
@@ -239,7 +285,6 @@ document.addEventListener("DOMContentLoaded", function () {
             methodSelectionPanel.style.display = "block";
         }
 
-        // ===== PØEPRACOVANÁ FUNKCE finalizeAddLayer =====
         async function finalizeAddLayer(methodKey) {
             if (!pendingLayer) return;
 
@@ -264,11 +309,9 @@ document.addEventListener("DOMContentLoaded", function () {
             map.add(layer);
             activeLayers.push(layer);
 
-            // Zjistíme výchozí pole
             const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
             const defaultField = numericFields.length > 0 ? numericFields[0] : null;
 
-            // Vytvoøíme doèasný div, abychom mohli pøeèíst výchozí hodnoty z UI
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = config.createUI();
             
@@ -277,9 +320,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 stats = await summaryStatistics({ layer, field: defaultField });
             }
             
-            // Nyní zavoláme getUIValues na tomto doèasném divu
             layer.currentSymbology = getUIValues(tempDiv, defaultField, stats);
-            layer.currentSymbology.labelField = "__none__"; // Toto je øádek 269, který selhával
+            layer.currentSymbology.labelField = "__none__";
             
             if (defaultField) {
                 applySymbology(layer); 
@@ -302,8 +344,62 @@ document.addEventListener("DOMContentLoaded", function () {
             methodSelectionPanel.style.display = "none";
             addLayerPanel.style.display = "block";
         }
-        // ===== KONEC PØEPRACOVANÉ FUNKCE =====
 
+        // ===== LOGIKA PRO 3D BUDOVY (SCENE LAYER) =====
+        async function handleLoadBuildings() {
+            const url = buildingsUrlInput.value;
+            if (!url) {
+                alert("Please enter a Scene Layer URL.");
+                return;
+            }
+
+            buildingsLoadingMessage.style.display = "block";
+            loadBuildingsBtn.disabled = true;
+
+            try {
+                const layer = new SceneLayer({ url: url });
+
+                await layer.load();
+                if (!layer.title) layer.title = "3D Buildings";
+
+                layer.isContextLayer = true; 
+                layer.methodKey = "building_context"; // Pøiøadíme novou metodu
+
+                // Inicializace výchozí symbologie pro budovy
+                layer.currentSymbology = {
+                    field: null, labelField: "__none__",
+                    stats: { min: 0, max: 0, avg: 0 },
+                    // Specifické hodnoty pro budovy:
+                    singleColor: "#ffffff",
+                    opacity: 1,
+                    showEdges: false
+                };
+
+                map.add(layer);
+                activeLayers.push(layer);
+                
+                // Aplikujeme výchozí symbologii
+                applySymbology(layer);
+
+                try {
+                    await view.whenLayerView(layer);
+                    view.goTo(layer.fullExtent, { duration: 1500 });
+                } catch (e) { console.error(e); }
+
+                updateLayerList();
+                addBuildingsPanel.style.display = "none";
+                buildingsUrlInput.value = ""; 
+
+            } catch (error) {
+                console.error("Failed to load buildings:", error);
+                alert("Could not load buildings. Ensure it is a valid Scene Layer URL.");
+            } finally {
+                buildingsLoadingMessage.style.display = "none";
+                loadBuildingsBtn.disabled = false;
+            }
+        }
+        
+        // ===== SPOLEÈNÉ FUNKCE =====
 
         function removeLayer(layerId) {
             const layerToRemove = activeLayers.find(l => l.id === layerId);
@@ -324,28 +420,35 @@ document.addEventListener("DOMContentLoaded", function () {
             symbologyPanelTitle.innerText = `Symbology (${config.title})`;
             
             let renameHTML = `<h2>Layer Name</h2><input type="text" id="layerNameInput">`;
+            
+            // Pokud je to kontextová vrstva (budovy), nezobrazíme výbìr atributù a labelù
+            if (layer.isContextLayer) {
+                symbologyControlsContainer.innerHTML = renameHTML + config.createUI();
+            } 
+            else {
+                // Pro bìžné vrstvy zobrazíme kompletní UI
+                const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
+                let attributeSelectorHTML = `<h2>Attribute to Visualize</h2>`;
+                if (numericFields.length > 0) {
+                    attributeSelectorHTML += `<select id="attributeSelect">`;
+                    numericFields.forEach(field => {
+                        attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
+                    });
+                    attributeSelectorHTML += `</select>`;
+                } else {
+                    attributeSelectorHTML += `<p style="color: var(--text-muted); font-size: 13px;">No numeric fields found in this layer.</p>`;
+                }
 
-            const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
-            let attributeSelectorHTML = `<h2>Attribute to Visualize</h2>`;
-            if (numericFields.length > 0) {
-                attributeSelectorHTML += `<select id="attributeSelect">`;
-                numericFields.forEach(field => {
-                    attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
+                const allFields = layer.fields.filter(f => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry");
+                let labelingSelectorHTML = `<h2>Labels</h2><select id="labelAttributeSelect">`;
+                labelingSelectorHTML += `<option value="__none__">-- No Labels --</option>`;
+                allFields.forEach(field => {
+                    labelingSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
                 });
-                attributeSelectorHTML += `</select>`;
-            } else {
-                attributeSelectorHTML += `<p style="color: var(--text-muted); font-size: 13px;">No numeric fields found in this layer.</p>`;
+                labelingSelectorHTML += `</select>`;
+
+                symbologyControlsContainer.innerHTML = renameHTML + attributeSelectorHTML + labelingSelectorHTML + config.createUI();
             }
-
-            const allFields = layer.fields.filter(f => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry");
-            let labelingSelectorHTML = `<h2>Labels</h2><select id="labelAttributeSelect">`;
-            labelingSelectorHTML += `<option value="__none__">-- No Labels --</option>`;
-            allFields.forEach(field => {
-                labelingSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
-            });
-            labelingSelectorHTML += `</select>`;
-
-            symbologyControlsContainer.innerHTML = renameHTML + attributeSelectorHTML + labelingSelectorHTML + config.createUI();
             
             const layerNameInput = document.getElementById("layerNameInput");
             if (layerNameInput) {
@@ -355,24 +458,18 @@ document.addEventListener("DOMContentLoaded", function () {
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "none";
             elevationPanel.style.display = "none"; 
+            addBuildingsPanel.style.display = "none"; 
             symbologyEditorPanel.style.display = "block";
             
             const attributeSelect = document.getElementById("attributeSelect");
-            if (attributeSelect && layer.currentSymbology.field) { // Zkontrolujeme, zda pole existuje
+            if (attributeSelect && layer.currentSymbology.field) {
                 attributeSelect.value = layer.currentSymbology.field;
             }
-
-            // OPRAVA: Tuto funkci už volá `attributeSelect.addEventListener`
-            // if (attributeSelect) {
-            //     await updateStatsAndSymbology(); 
-            // }
             
-            addEventListenersToControls(); // Pøidá listenery
+            addEventListenersToControls(); 
 
-            // OPRAVA: Manuálnì nastavíme hodnoty UI z uložené symbologie
-            // Toto je klíèové po opravì finalizeAddLayer
             updateUIFromValues(layer.currentSymbology);
-            updatePreviewFromInputs(); // Aktualizujeme náhled barev
+            updatePreviewFromInputs(); 
 
             const labelAttributeSelect = document.getElementById("labelAttributeSelect");
             if (labelAttributeSelect && layer.currentSymbology.labelField) {
@@ -392,18 +489,36 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             layerListUl.innerHTML = "";
             [...activeLayers].reverse().forEach(layer => {
-                const config = visualizationMethods[layer.methodKey];
                 const li = document.createElement("li");
+                
                 const visibilityIcon = layer.visible ? "esri-icon-visible" : "esri-icon-non-visible";
                 const visibilityTitle = layer.visible ? "Hide Layer" : "Show Layer";
+
+                let methodLabelHtml = "";
+                let methodLabelText = ""; 
+                let editButtonHTML = "";
+
+                if (layer.isContextLayer) {
+                    methodLabelText = "(3D Buildings)";
+                    methodLabelHtml = `<span class="context-method-name">${methodLabelText}</span>`;
+                    // Nyní povolíme editaci i pro budovy!
+                    editButtonHTML = `<button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>`;
+                } else {
+                    const config = visualizationMethods[layer.methodKey];
+                    methodLabelText = `(${config.title})`;
+                    methodLabelHtml = `<span class="method-name">${methodLabelText}</span>`;
+                    editButtonHTML = `<button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>`;
+                }
+                
+                const tooltipText = `${layer.title || 'Layer'} ${methodLabelText}`;
                 
                 li.innerHTML = `
-                    <span title="${layer.title || 'Layer'} (${config.title})">
-                        ${layer.title || 'Layer'} <span class="method-name">(${config.title})</span>
+                    <span title="${tooltipText}">
+                        ${layer.title || 'Layer'} ${methodLabelHtml}
                     </span>
                     <div class="layer-controls">
                         <button class="toggle-visibility-btn ${visibilityIcon}" data-layer-id="${layer.id}" title="${visibilityTitle}"></button>
-                        <button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>
+                        ${editButtonHTML}
                         <button class="remove-layer-btn esri-icon-trash" data-layer-id="${layer.id}" title="Remove Layer"></button>
                     </div>
                 `;
@@ -411,23 +526,25 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
         
-        // ===== PØEPRACOVANÁ FUNKCE updateUIFromValues =====
         function updateUIFromValues(values) {
             if (!values) return;
             
             const setInputValue = (id, value) => {
                 const el = document.getElementById(id);
-                // Pøidána kontrola, zda prvek existuje v DOM (v panelu symbologie)
+                // Pro checkboxy musíme nastavit 'checked' místo 'value'
                 if (el && value !== null && value !== undefined) {
-                    el.value = value;
+                    if (el.type === "checkbox") {
+                        el.checked = value;
+                    } else {
+                        el.value = value;
+                    }
                 }
             };
             
-            // Nastaví pouze ty hodnoty, které jsou relevantní pro aktuální panel
             setInputValue("labelAttributeSelect", values.labelField);
-            setInputValue("startColorPicker", values.rawColors.start);
-            setInputValue("middleColorPicker", values.rawColors.middle);
-            setInputValue("endColorPicker", values.rawColors.end);
+            setInputValue("startColorPicker", values.rawColors?.start);
+            setInputValue("middleColorPicker", values.rawColors?.middle);
+            setInputValue("endColorPicker", values.rawColors?.end);
             setInputValue("transparencyInput", values.opacity);
             setInputValue("planeHeightInput", values.height);
             setInputValue("sizeInput", values.size);
@@ -438,10 +555,12 @@ document.addEventListener("DOMContentLoaded", function () {
             setInputValue("shapeSelect", values.shape);
             setInputValue("diameterInput", values.diameter);
             setInputValue("heightAboveGroundInput", values.height);
+            
+            // Nové hodnoty pro budovy
+            setInputValue("singleColorPicker", values.singleColor);
+            setInputValue("edgesCheckbox", values.showEdges);
         }
 
-        // ===== PØEPRACOVANÁ FUNKCE getUIValues =====
-        // Nyní správnì ète POUZE z `symbologyControlsContainer`
         function getUIValues(sourceElement = symbologyControlsContainer, field = null, stats = null) {
             const getValue = (id, isFloat = false, defaultValue = null) => {
                 const input = sourceElement.querySelector(`#${id}`); if (!input) return defaultValue;
@@ -452,6 +571,11 @@ document.addEventListener("DOMContentLoaded", function () {
                  const el = sourceElement.querySelector(`#${id}`);
                  return el ? el.value : defaultValue;
             };
+            // Helper pro checkbox
+            const getBool = (id, defaultValue = false) => {
+                const el = sourceElement.querySelector(`#${id}`);
+                return el ? el.checked : defaultValue;
+            };
 
             const startColor = getString("startColorPicker", "#4575b4");
             const middleColor = getString("middleColorPicker", "#ffffbf");
@@ -459,7 +583,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const finalStats = stats || focusedLayer?.currentSymbology.stats || { min: 0, max: 0, avg: 0 };
             
-            // OPRAVA: Èteme 'attributeSelect' ze 'sourceElement'
             const attributeSelect = sourceElement.querySelector("#attributeSelect");
 
             return {
@@ -477,6 +600,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 maxSize: getValue("maxSizeInput"),
                 diameter: getValue("diameterInput"),
                 shape: getString("shapeSelect"),
+                
+                // Hodnoty pro budovy
+                singleColor: getString("singleColorPicker", "#ffffff"),
+                showEdges: getBool("edgesCheckbox", false)
             };
         }
 
@@ -509,7 +636,6 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!layerToApply) return;
             
             const config = visualizationMethods[layerToApply.methodKey];
-            // OPRAVA: Vždy naèteme aktuální hodnoty z UI, pokud je panel otevøený
             const uiValues = (focusedLayer && layerToApply.id === focusedLayer.id && symbologyEditorPanel.style.display === "block") 
                 ? getUIValues() 
                 : layerToApply.currentSymbology;
@@ -520,37 +646,41 @@ document.addEventListener("DOMContentLoaded", function () {
                 layerToApply.currentSymbology = uiValues;
             }
 
-            if (uiValues.field) {
-                 if(config.createRenderer) layerToApply.renderer = config.createRenderer(uiValues);
+            // Aplikace rendereru
+            if (config.createRenderer) {
+                layerToApply.renderer = config.createRenderer(uiValues);
             }
            
             if(config.applyProperties) config.applyProperties(layerToApply, uiValues);
             
-            if (uiValues.labelField && uiValues.labelField !== "__none__") {
-                const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
-                const fieldType = field ? field.type : "string"; 
-                
-                let labelExpression;
-                if (["double", "integer", "single", "small-integer"].includes(fieldType)) {
-                    labelExpression = `Text($feature.${uiValues.labelField}, '#,###')`;
-                } else {
-                    labelExpression = `$feature.${uiValues.labelField}`;
-                }
-
-                layerToApply.labelingInfo = [{
-                    labelExpressionInfo: { expression: labelExpression },
-                    symbol: {
-                        type: "label-3d",
-                        symbolLayers: [{
-                            type: "text",
-                            material: { color: "#E0E0E0" },
-                            halo: { color: [0, 0, 0, 0.7], size: 1 },
-                            font: { size: 10, family: "Open Sans" },
-                        }]
+            // Labely øešíme jen pokud to není kontextová vrstva
+            if (!layerToApply.isContextLayer) {
+                if (uiValues.labelField && uiValues.labelField !== "__none__") {
+                    const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
+                    const fieldType = field ? field.type : "string"; 
+                    
+                    let labelExpression;
+                    if (["double", "integer", "single", "small-integer"].includes(fieldType)) {
+                        labelExpression = `Text($feature.${uiValues.labelField}, '#,###')`;
+                    } else {
+                        labelExpression = `$feature.${uiValues.labelField}`;
                     }
-                }];
-            } else {
-                layerToApply.labelingInfo = null; 
+
+                    layerToApply.labelingInfo = [{
+                        labelExpressionInfo: { expression: labelExpression },
+                        symbol: {
+                            type: "label-3d",
+                            symbolLayers: [{
+                                type: "text",
+                                material: { color: "#E0E0E0" },
+                                halo: { color: [0, 0, 0, 0.7], size: 1 },
+                                font: { size: 10, family: "Open Sans" },
+                            }]
+                        }
+                    }];
+                } else {
+                    layerToApply.labelingInfo = null; 
+                }
             }
         }
         
@@ -571,7 +701,6 @@ document.addEventListener("DOMContentLoaded", function () {
         function updatePreviewFromInputs() {
             const colorRampPreview = document.getElementById("colorRampPreview");
             if (!colorRampPreview) return;
-            // OPRAVA: getUIValues musí èíst z aktuálního panelu
             const uiValues = getUIValues(symbologyControlsContainer); 
             if (!uiValues || !uiValues.colorStops) return;
             const colors = uiValues.colorStops.map(stop => stop.color);
@@ -608,6 +737,8 @@ document.addEventListener("DOMContentLoaded", function () {
         loadLayerBtn.addEventListener("click", handleLoadLayer);
         cancelMethodBtn.addEventListener("click", cancelMethodSelection);
         document.getElementById("closeSymbologyBtn").addEventListener("click", closeSymbologyEditor);
+        
+        loadBuildingsBtn.addEventListener("click", handleLoadBuildings);
 
         layerListUl.addEventListener("click", (event) => {
             const button = event.target.closest("button");
@@ -633,6 +764,7 @@ document.addEventListener("DOMContentLoaded", function () {
             methodSelectionPanel.style.display = "none";
             symbologyEditorPanel.style.display = "none";
             elevationPanel.style.display = "none";
+            addBuildingsPanel.style.display = "none"; 
         }
         
         addThematicLayerBtn.addEventListener("click", () => {
@@ -640,6 +772,14 @@ document.addEventListener("DOMContentLoaded", function () {
             hideAllRightPanels(); 
             if (!isVisible) {
                 addLayerPanel.style.display = "block";
+            }
+        });
+
+        addBuildingsBtn.addEventListener("click", () => {
+            const isVisible = addBuildingsPanel.style.display === "block";
+            hideAllRightPanels();
+            if (!isVisible) {
+                addBuildingsPanel.style.display = "block";
             }
         });
 
@@ -702,7 +842,38 @@ document.addEventListener("DOMContentLoaded", function () {
             if (helpOverlay) helpOverlay.style.display = "flex";
         };
 
-        helpButton.addEventListener("click", openHelp);
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = element.innerText;
+                element.innerText = "Copied!";
+                element.style.color = "#FFD54F"; 
+                setTimeout(() => {
+                    element.innerText = originalText;
+                    element.style.color = "#f0f0f0"; 
+                }, 1500); 
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        helpButton.addEventListener("click", () => {
+            openHelp();
+            const demoPoints = document.getElementById("demo-points");
+            if (demoPoints) demoPoints.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
+            
+            const demoLines = document.getElementById("demo-lines");
+            if (demoLines) demoLines.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
+            
+            const demoPolygons = document.getElementById("demo-polygons");
+            if (demoPolygons) demoPolygons.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
+            
+            const demoBuildings = document.getElementById("demo-buildings");
+            if (demoBuildings) demoBuildings.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
+
+            const demoElevation = document.getElementById("demo-elevation");
+            if (demoElevation) demoElevation.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
+        });
+
         closeHelpModalBtn.addEventListener("click", closeHelp);
         helpOverlay.addEventListener("click", (e) => { 
             if (e.target === helpOverlay) closeHelp(); 
@@ -712,48 +883,6 @@ document.addEventListener("DOMContentLoaded", function () {
             if (e.key === "Escape") {
                 closeHelp();
                 hideAllRightPanels();
-            }
-        });
-        
-        function copyToClipboard(text, element) {
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = element.innerText;
-                element.innerText = "Copied!";
-                element.style.color = "#FFD54F"; // Použijeme barvu, kterou máme rádi
-                
-                setTimeout(() => {
-                    element.innerText = originalText;
-                    element.style.color = "#f0f0f0"; // Vrátíme pùvodní barvu
-                }, 1500); // Zpìtná vazba zmizí po 1.5 sekundì
-            }).catch(err => {
-                console.error('Failed to copy text: ', err);
-            });
-        }
-
-        // Pøiøadíme listenery k prvkùm v nápovìdì
-        // Musíme to navázat na 'helpButton', protože prvky existují až po otevøení
-        helpButton.addEventListener("click", () => {
-            // Tyto listenery se pøiøadí jen jednou, i když se 'openHelp' volá opakovanì
-            // Používáme '.onclick' místo 'addEventListener' abychom zabránili vícenásobnému pøiøazení
-            
-            const demoPoints = document.getElementById("demo-points");
-            if (demoPoints) {
-                demoPoints.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            }
-            
-            const demoLines = document.getElementById("demo-lines");
-            if (demoLines) {
-                demoLines.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            }
-            
-            const demoPolygons = document.getElementById("demo-polygons");
-            if (demoPolygons) {
-                demoPolygons.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            }
-            
-            const demoElevation = document.getElementById("demo-elevation");
-            if (demoElevation) {
-                demoElevation.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
             }
         });
         

@@ -91,7 +91,7 @@ html, body {
   transition: opacity 0.3s, transform 0.3s;
 }
 
-#addLayerPanel, #symbologyEditorPanel, #methodSelectionPanel, #elevationPanel {
+#addLayerPanel, #symbologyEditorPanel, #methodSelectionPanel, #elevationPanel, #addBuildingsPanel {
   position: absolute;
   top: calc(var(--header-h) + 15px);
   right: 15px; 
@@ -420,4 +420,10 @@ input[type="range"]::-moz-range-thumb {
 }
 .primary-btn:hover {
     background-color: #0099f7;
+}
+
+.context-method-name {
+    color: #4fc3f7;
+    font-size: 0.9em;
+    font-style: italic;
 }
