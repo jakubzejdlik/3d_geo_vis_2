@@ -118,10 +118,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 }),
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
-            // ===== NOVÁ METODA: 3D Buildings Context =====
+            // ===== METODA PRO BUDOVY S VÝBÌREM BARVY HRAN =====
             building_context: {
                 title: "3D Buildings",
-                compatibleGeometry: ["mesh"], // SceneLayers
+                compatibleGeometry: ["mesh"], 
                 createUI: () => `
                     <h2>Color</h2>
                     <input type="color" id="singleColorPicker" value="#ffffff" style="width:100%; height:40px; cursor:pointer;">
@@ -130,10 +130,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     <input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01">
                     
                     <h2>Edges</h2>
-                    <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                         <input type="checkbox" id="edgesCheckbox">
                         <label for="edgesCheckbox" style="margin:0; cursor:pointer;">Show Edges</label>
                     </div>
+                    <label for="edgeColorPicker" style="font-size:12px;">Edge Color:</label>
+                    <input type="color" id="edgeColorPicker" value="#000000" style="width:100%; height:30px; cursor:pointer;">
                 `,
                 createRenderer: (uiValues) => ({
                     type: "simple",
@@ -143,11 +145,11 @@ document.addEventListener("DOMContentLoaded", function () {
                             type: "fill",
                             material: { 
                                 color: uiValues.singleColor, 
-                                colorMixMode: "replace" // Pøepíše pùvodní textury
+                                colorMixMode: "replace" 
                             },
                             edges: uiValues.showEdges ? {
                                 type: "solid",
-                                color: [0, 0, 0, 0.6],
+                                color: uiValues.edgeColor, // POUŽITÍ DYNAMICKÉ BARVY HRAN
                                 size: 1
                             } : null
                         }]
@@ -363,28 +365,30 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!layer.title) layer.title = "3D Buildings";
 
                 layer.isContextLayer = true; 
-                layer.methodKey = "building_context"; // Pøiøadíme novou metodu
+                layer.methodKey = "building_context"; 
 
-                // Inicializace výchozí symbologie pro budovy
+                // Inicializace výchozí symbologie pro budovy vè. barvy hran
                 layer.currentSymbology = {
                     field: null, labelField: "__none__",
                     stats: { min: 0, max: 0, avg: 0 },
-                    // Specifické hodnoty pro budovy:
                     singleColor: "#ffffff",
                     opacity: 1,
-                    showEdges: false
+                    showEdges: false,
+                    edgeColor: "#000000" // Výchozí èerná barva hran
                 };
 
                 map.add(layer);
                 activeLayers.push(layer);
                 
-                // Aplikujeme výchozí symbologii
                 applySymbology(layer);
 
                 try {
                     await view.whenLayerView(layer);
                     view.goTo(layer.fullExtent, { duration: 1500 });
                 } catch (e) { console.error(e); }
+
+                // NOVÉ: Otevøení symbology editoru po naètení budov
+                openSymbologyEditor(layer);
 
                 updateLayerList();
                 addBuildingsPanel.style.display = "none";
@@ -421,12 +425,10 @@ document.addEventListener("DOMContentLoaded", function () {
             
             let renameHTML = `<h2>Layer Name</h2><input type="text" id="layerNameInput">`;
             
-            // Pokud je to kontextová vrstva (budovy), nezobrazíme výbìr atributù a labelù
             if (layer.isContextLayer) {
                 symbologyControlsContainer.innerHTML = renameHTML + config.createUI();
             } 
             else {
-                // Pro bìžné vrstvy zobrazíme kompletní UI
                 const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
                 let attributeSelectorHTML = `<h2>Attribute to Visualize</h2>`;
                 if (numericFields.length > 0) {
@@ -501,7 +503,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (layer.isContextLayer) {
                     methodLabelText = "(3D Buildings)";
                     methodLabelHtml = `<span class="context-method-name">${methodLabelText}</span>`;
-                    // Nyní povolíme editaci i pro budovy!
                     editButtonHTML = `<button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>`;
                 } else {
                     const config = visualizationMethods[layer.methodKey];
@@ -531,7 +532,6 @@ document.addEventListener("DOMContentLoaded", function () {
             
             const setInputValue = (id, value) => {
                 const el = document.getElementById(id);
-                // Pro checkboxy musíme nastavit 'checked' místo 'value'
                 if (el && value !== null && value !== undefined) {
                     if (el.type === "checkbox") {
                         el.checked = value;
@@ -556,9 +556,9 @@ document.addEventListener("DOMContentLoaded", function () {
             setInputValue("diameterInput", values.diameter);
             setInputValue("heightAboveGroundInput", values.height);
             
-            // Nové hodnoty pro budovy
             setInputValue("singleColorPicker", values.singleColor);
             setInputValue("edgesCheckbox", values.showEdges);
+            setInputValue("edgeColorPicker", values.edgeColor); 
         }
 
         function getUIValues(sourceElement = symbologyControlsContainer, field = null, stats = null) {
@@ -571,7 +571,6 @@ document.addEventListener("DOMContentLoaded", function () {
                  const el = sourceElement.querySelector(`#${id}`);
                  return el ? el.value : defaultValue;
             };
-            // Helper pro checkbox
             const getBool = (id, defaultValue = false) => {
                 const el = sourceElement.querySelector(`#${id}`);
                 return el ? el.checked : defaultValue;
@@ -603,7 +602,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 
                 // Hodnoty pro budovy
                 singleColor: getString("singleColorPicker", "#ffffff"),
-                showEdges: getBool("edgesCheckbox", false)
+                showEdges: getBool("edgesCheckbox", false),
+                edgeColor: getString("edgeColorPicker", "#000000") 
             };
         }
 
@@ -646,14 +646,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 layerToApply.currentSymbology = uiValues;
             }
 
-            // Aplikace rendereru
             if (config.createRenderer) {
                 layerToApply.renderer = config.createRenderer(uiValues);
             }
            
             if(config.applyProperties) config.applyProperties(layerToApply, uiValues);
             
-            // Labely øešíme jen pokud to není kontextová vrstva
             if (!layerToApply.isContextLayer) {
                 if (uiValues.labelField && uiValues.labelField !== "__none__") {
                     const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
