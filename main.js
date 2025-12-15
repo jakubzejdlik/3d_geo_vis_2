@@ -11,8 +11,12 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/widgets/Expand",
         "esri/widgets/Legend",
         "esri/smartMapping/statistics/summaryStatistics",
-        "esri/Viewpoint"
-    ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint) {
+        "esri/Viewpoint",
+        "esri/core/reactiveUtils"
+    ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint, reactiveUtils) {
+
+        // Helper pro debounce
+        function debounce(fn, d = 500) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), d); }; }
 
         const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div>`;
         
@@ -118,17 +122,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 }),
                 applyProperties: (layer, uiValues) => { layer.opacity = uiValues.opacity; layer.elevationInfo = { mode: "relative-to-ground", offset: uiValues.height }; }
             },
-            // ===== METODA PRO BUDOVY S VÝBÌREM BARVY HRAN =====
             building_context: {
                 title: "3D Buildings",
                 compatibleGeometry: ["mesh"], 
                 createUI: () => `
                     <h2>Color</h2>
                     <input type="color" id="singleColorPicker" value="#ffffff" style="width:100%; height:40px; cursor:pointer;">
-                    
                     <h2>Transparency</h2>
                     <input type="range" id="transparencyInput" value="1" min="0" max="1" step="0.01">
-                    
                     <h2>Edges</h2>
                     <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                         <input type="checkbox" id="edgesCheckbox">
@@ -143,15 +144,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         type: "mesh-3d",
                         symbolLayers: [{
                             type: "fill",
-                            material: { 
-                                color: uiValues.singleColor, 
-                                colorMixMode: "replace" 
-                            },
-                            edges: uiValues.showEdges ? {
-                                type: "solid",
-                                color: uiValues.edgeColor, // POUŽITÍ DYNAMICKÉ BARVY HRAN
-                                size: 1
-                            } : null
+                            material: { color: uiValues.singleColor, colorMixMode: "replace" },
+                            edges: uiValues.showEdges ? { type: "solid", color: uiValues.edgeColor, size: 1 } : null
                         }]
                     }
                 }),
@@ -168,11 +162,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const defaultGround = new Ground({ layers: [new ElevationLayer({ url: "//elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer" })] });
         const map = new Map({ basemap: "topo-vector", ground: defaultGround });
         
-        const homeButtonViewpoint = new Viewpoint({
-            camera: { position: { latitude: 48, longitude: 15, z: 25000000 }, tilt: 0, heading: -1 }
-        });
-
-        const animationTargetViewpoint = new Viewpoint({
+        const homeViewpoint = new Viewpoint({
             camera: { position: { latitude: 48, longitude: 15, z: 15000000 }, tilt: 0, heading: -1 }
         });
         
@@ -184,18 +174,15 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         
         view.ui.padding = { top: 65, bottom: 35 };
-        
-        view.ui.add(new Home({ view: view, viewpoint: homeButtonViewpoint }), "top-left");
+        view.ui.add(new Home({ view: view, viewpoint: homeViewpoint }), "top-left");
         view.ui.add(new Expand({ view, content: new BasemapGallery({ view }), expandIconClass: "esri-icon-basemap" }), "top-left");
         view.ui.add(new Expand({ view: view, content: new Legend({ view }), expandIconClass: "esri-icon-legend" }), "bottom-left");
 
-        // Reference na panely
+        // UI Reference
         const addLayerPanel = document.getElementById("addLayerPanel");
         const methodSelectionPanel = document.getElementById("methodSelectionPanel");
         const symbologyEditorPanel = document.getElementById("symbologyEditorPanel");
         const layerListUl = document.getElementById("layer-list");
-        
-        // Reference na ovládací prvky
         const layerUrlInput = document.getElementById("layerUrlInput");
         const loadLayerBtn = document.getElementById("loadLayerBtn");
         const loadingMessage = document.getElementById("loadingMessage");
@@ -203,10 +190,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const cancelMethodBtn = document.getElementById("cancelMethodBtn");
         const symbologyControlsContainer = document.getElementById("symbology-controls-container");
         const symbologyPanelTitle = document.getElementById("symbologyPanelTitle");
-        
         const addThematicLayerBtn = document.getElementById("addThematicLayerBtn");
-        
-        // Prvky panelu výškopisu
+
+        // Elevation UI
         const changeElevationBtn = document.getElementById("changeElevationBtn");
         const elevationPanel = document.getElementById("elevationPanel");
         const defaultElevationRadio = document.getElementById("defaultElevationRadio");
@@ -215,44 +201,130 @@ document.addEventListener("DOMContentLoaded", function () {
         const applyElevationBtn = document.getElementById("applyElevationBtn");
         const elevationLoadingMessage = document.getElementById("elevationLoadingMessage");
 
-        // Prvky panelu budov
+        // Buildings UI
         const addBuildingsBtn = document.getElementById("addBuildingsBtn");
         const addBuildingsPanel = document.getElementById("addBuildingsPanel");
         const buildingsUrlInput = document.getElementById("buildingsUrlInput");
         const loadBuildingsBtn = document.getElementById("loadBuildingsBtn");
         const buildingsLoadingMessage = document.getElementById("buildingsLoadingMessage");
 
+        // Share Link UI
+        const shareLinkBtn = document.getElementById("shareLinkBtn");
 
-        // ===== LOGIKA PRO NAÈTENÍ TEMATICKÉ VRSTVY =====
-        async function handleLoadLayer() {
-            const url = layerUrlInput.value;
-            if (!url) {
-                alert("Please enter a Feature Layer URL.");
-                return;
+        // ===== LOGIKA SDÍLENÍ STAVU (URL) =====
+        
+        function updateShareUrl() {
+            let currentElevationUrl = null;
+            if (customElevationRadio.checked && map.ground.layers.length > 0) {
+                currentElevationUrl = map.ground.layers.getItemAt(0).url;
             }
 
+            const state = {
+                layers: activeLayers.map(l => ({
+                    url: l.url,
+                    title: l.title,
+                    methodKey: l.methodKey,
+                    symbology: l.currentSymbology,
+                    visible: l.visible,
+                    isContext: !!l.isContextLayer
+                })),
+                camera: view.camera.toJSON(),
+                elevation: currentElevationUrl
+            };
+
+            const encodedState = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('state', encodedState);
+            window.history.replaceState({}, '', newUrl);
+        }
+
+        async function loadStateFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const stateParam = params.get('state');
+            if (!stateParam) return false; 
+
+            try {
+                const decodedState = JSON.parse(decodeURIComponent(escape(atob(stateParam))));
+                
+                // 1. Obnova kamery
+                if (decodedState.camera) {
+                    view.camera = decodedState.camera;
+                }
+
+                // 2. Obnova výškopisu
+                if (decodedState.elevation) {
+                     const newElevationLayer = new ElevationLayer({ url: decodedState.elevation });
+                     await newElevationLayer.load();
+                     map.ground = new Ground({ layers: [newElevationLayer] });
+                     customElevationRadio.checked = true;
+                     elevationUrlInput.value = decodedState.elevation;
+                     elevationUrlInput.disabled = false;
+                }
+
+                // 3. Obnova vrstev
+                if (decodedState.layers && Array.isArray(decodedState.layers)) {
+                    for (const lData of decodedState.layers) {
+                        let layer;
+                        if (lData.isContext) {
+                            layer = new SceneLayer({ url: lData.url });
+                        } else {
+                            layer = new FeatureLayer({ url: lData.url, outFields: ["*"] });
+                        }
+                        
+                        layer.title = lData.title;
+                        
+                        try {
+                            await layer.load();
+                            
+                            layer.methodKey = lData.methodKey;
+                            layer.currentSymbology = lData.symbology;
+                            layer.visible = lData.visible;
+                            if (lData.isContext) layer.isContextLayer = true;
+
+                            map.add(layer);
+                            activeLayers.push(layer);
+                            
+                            applySymbology(layer);
+                        } catch (err) {
+                            console.error("Failed to restore layer:", lData.title, err);
+                        }
+                    }
+                    updateLayerList();
+                }
+                return true; 
+
+            } catch (e) {
+                console.error("Chyba pøi naèítání sdíleného odkazu:", e);
+                return false;
+            }
+        }
+
+        if (shareLinkBtn) {
+            shareLinkBtn.addEventListener("click", () => {
+                navigator.clipboard.writeText(window.location.href);
+                alert("Link copied to clipboard!");
+            });
+        }
+
+        view.watch("camera", debounce(() => updateShareUrl(), 1000));
+
+        // ===== KONEC LOGIKY SDÍLENÍ =====
+
+
+        async function handleLoadLayer() {
+            const url = layerUrlInput.value;
+            if (!url) { alert("Please enter a Feature Layer URL."); return; }
             loadingMessage.style.display = "block";
             loadLayerBtn.disabled = true;
             pendingLayer = null; 
-
             try {
-                pendingLayer = new FeatureLayer({
-                    url: url,
-                    outFields: ["*"] 
-                });
-
+                pendingLayer = new FeatureLayer({ url: url, outFields: ["*"] });
                 await pendingLayer.load();
-                
-                if (!pendingLayer.title) {
-                    pendingLayer.title = "New Layer";
-                }
-                
-                const geomType = pendingLayer.geometryType; 
-                showMethodSelection(geomType);
-
+                if (!pendingLayer.title) pendingLayer.title = "New Layer";
+                showMethodSelection(pendingLayer.geometryType);
             } catch (error) {
                 console.error("Failed to load layer:", error);
-                alert("Could not load layer. Please check the URL and ensure it is a valid ArcGIS Feature Layer.");
+                alert("Could not load layer.");
                 pendingLayer = null;
             } finally {
                 loadingMessage.style.display = "none";
@@ -262,83 +334,63 @@ document.addEventListener("DOMContentLoaded", function () {
 
         function showMethodSelection(geometryType) {
             methodButtonsContainer.innerHTML = ""; 
-            
-            const compatibleMethods = Object.keys(visualizationMethods).filter(key => {
-                const config = visualizationMethods[key];
-                return config.compatibleGeometry.includes(geometryType);
-            });
-
+            const compatibleMethods = Object.keys(visualizationMethods).filter(key => visualizationMethods[key].compatibleGeometry.includes(geometryType));
             if (compatibleMethods.length === 0) {
-                alert(`No compatible visualization methods found for this geometry type (${geometryType}).`);
-                pendingLayer = null;
-                return;
+                alert(`No compatible visualization methods found for (${geometryType}).`);
+                pendingLayer = null; return;
             }
-
             compatibleMethods.forEach(key => {
-                const config = visualizationMethods[key];
                 const btn = document.createElement("button");
                 btn.className = "method-btn";
-                btn.innerText = config.title;
+                btn.innerText = visualizationMethods[key].title;
                 btn.onclick = () => finalizeAddLayer(key);
                 methodButtonsContainer.appendChild(btn);
             });
-
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "block";
         }
 
         async function finalizeAddLayer(methodKey) {
             if (!pendingLayer) return;
-
             const layer = pendingLayer;
             pendingLayer = null; 
-
             const config = visualizationMethods[methodKey];
             
-            const allFieldInfos = layer.fields
-                .filter(field => field.type !== "oid" && field.type !== "global-id" && field.type !== "geometry")
-                .map(field => ({
-                    fieldName: field.name,
-                    label: field.alias || field.name
-                }));
+            const allFieldInfos = layer.fields.filter(field => !["oid", "global-id", "geometry"].includes(field.type))
+                .map(field => ({ fieldName: field.name, label: field.alias || field.name }));
             
-            layer.popupTemplate = {
-                title: config.title, 
-                content: [{ type: "fields", fieldInfos: allFieldInfos }]
-            };
-
+            layer.popupTemplate = { title: config.title, content: [{ type: "fields", fieldInfos: allFieldInfos }] };
             layer.methodKey = methodKey;
+            
             map.add(layer);
             activeLayers.push(layer);
 
             const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
             const defaultField = numericFields.length > 0 ? numericFields[0] : null;
 
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = config.createUI();
-            
-            let stats = { min: 0, max: 0, avg: 0 };
             if (defaultField) {
-                stats = await summaryStatistics({ layer, field: defaultField });
-            }
-            
-            layer.currentSymbology = getUIValues(tempDiv, defaultField, stats);
-            layer.currentSymbology.labelField = "__none__";
-            
-            if (defaultField) {
+                const stats = await summaryStatistics({ layer, field: defaultField });
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = config.createUI();
+                layer.currentSymbology = getUIValues(tempDiv, defaultField, stats);
+                layer.currentSymbology.labelField = "__none__";
                 applySymbology(layer); 
+            } else {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = config.createUI();
+                layer.currentSymbology = getUIValues(tempDiv, null, {min: 0, max: 0, avg: 0});
+                layer.currentSymbology.labelField = "__none__";
             }
             
             try {
                 await view.whenLayerView(layer);
                 view.goTo(layer.fullExtent, { duration: 1500 });
-            } catch (e) {
-                console.error("Failed to zoom to layer extent:", e);
-            }
+            } catch (e) { console.error(e); }
             
-            openSymbologyEditor(layer); 
+            openSymbologyEditor(layer);
             updateLayerList();
             methodSelectionPanel.style.display = "none";
+            updateShareUrl(); 
         }
 
         function cancelMethodSelection() {
@@ -347,39 +399,26 @@ document.addEventListener("DOMContentLoaded", function () {
             addLayerPanel.style.display = "block";
         }
 
-        // ===== LOGIKA PRO 3D BUDOVY (SCENE LAYER) =====
+        // ===== LOGIKA PRO 3D BUDOVY =====
         async function handleLoadBuildings() {
             const url = buildingsUrlInput.value;
-            if (!url) {
-                alert("Please enter a Scene Layer URL.");
-                return;
-            }
-
+            if (!url) { alert("Please enter a Scene Layer URL."); return; }
             buildingsLoadingMessage.style.display = "block";
             loadBuildingsBtn.disabled = true;
 
             try {
                 const layer = new SceneLayer({ url: url });
-
                 await layer.load();
                 if (!layer.title) layer.title = "3D Buildings";
-
                 layer.isContextLayer = true; 
                 layer.methodKey = "building_context"; 
-
-                // Inicializace výchozí symbologie pro budovy vè. barvy hran
                 layer.currentSymbology = {
-                    field: null, labelField: "__none__",
-                    stats: { min: 0, max: 0, avg: 0 },
-                    singleColor: "#ffffff",
-                    opacity: 1,
-                    showEdges: false,
-                    edgeColor: "#000000" // Výchozí èerná barva hran
+                    field: null, labelField: "__none__", stats: { min: 0, max: 0, avg: 0 },
+                    singleColor: "#ffffff", opacity: 1, showEdges: false, edgeColor: "#000000"
                 };
 
                 map.add(layer);
                 activeLayers.push(layer);
-                
                 applySymbology(layer);
 
                 try {
@@ -387,16 +426,15 @@ document.addEventListener("DOMContentLoaded", function () {
                     view.goTo(layer.fullExtent, { duration: 1500 });
                 } catch (e) { console.error(e); }
 
-                // NOVÉ: Otevøení symbology editoru po naètení budov
                 openSymbologyEditor(layer);
-
                 updateLayerList();
                 addBuildingsPanel.style.display = "none";
                 buildingsUrlInput.value = ""; 
+                updateShareUrl(); 
 
             } catch (error) {
                 console.error("Failed to load buildings:", error);
-                alert("Could not load buildings. Ensure it is a valid Scene Layer URL.");
+                alert("Could not load buildings.");
             } finally {
                 buildingsLoadingMessage.style.display = "none";
                 loadBuildingsBtn.disabled = false;
@@ -404,16 +442,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         
         // ===== SPOLEÈNÉ FUNKCE =====
-
         function removeLayer(layerId) {
             const layerToRemove = activeLayers.find(l => l.id === layerId);
             if (!layerToRemove) return;
             map.remove(layerToRemove);
             activeLayers = activeLayers.filter(l => l.id !== layerId);
-            if (focusedLayer && focusedLayer.id === layerId) {
-                closeSymbologyEditor();
-            }
+            if (focusedLayer && focusedLayer.id === layerId) closeSymbologyEditor();
             updateLayerList();
+            updateShareUrl(); 
         }
 
         async function openSymbologyEditor(layer) {
@@ -422,40 +458,31 @@ document.addEventListener("DOMContentLoaded", function () {
             
             const config = visualizationMethods[layer.methodKey];
             symbologyPanelTitle.innerText = `Symbology (${config.title})`;
-            
             let renameHTML = `<h2>Layer Name</h2><input type="text" id="layerNameInput">`;
             
             if (layer.isContextLayer) {
                 symbologyControlsContainer.innerHTML = renameHTML + config.createUI();
-            } 
-            else {
+            } else {
                 const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type));
                 let attributeSelectorHTML = `<h2>Attribute to Visualize</h2>`;
                 if (numericFields.length > 0) {
                     attributeSelectorHTML += `<select id="attributeSelect">`;
-                    numericFields.forEach(field => {
-                        attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
-                    });
+                    numericFields.forEach(field => attributeSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`);
                     attributeSelectorHTML += `</select>`;
                 } else {
-                    attributeSelectorHTML += `<p style="color: var(--text-muted); font-size: 13px;">No numeric fields found in this layer.</p>`;
+                    attributeSelectorHTML += `<p style="color: var(--text-muted); font-size: 13px;">No numeric fields found.</p>`;
                 }
 
-                const allFields = layer.fields.filter(f => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry");
-                let labelingSelectorHTML = `<h2>Labels</h2><select id="labelAttributeSelect">`;
-                labelingSelectorHTML += `<option value="__none__">-- No Labels --</option>`;
-                allFields.forEach(field => {
-                    labelingSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`;
-                });
+                const allFields = layer.fields.filter(f => !["oid", "global-id", "geometry"].includes(f.type));
+                let labelingSelectorHTML = `<h2>Labels</h2><select id="labelAttributeSelect"><option value="__none__">-- No Labels --</option>`;
+                allFields.forEach(field => labelingSelectorHTML += `<option value="${field.name}">${field.alias || field.name}</option>`);
                 labelingSelectorHTML += `</select>`;
 
                 symbologyControlsContainer.innerHTML = renameHTML + attributeSelectorHTML + labelingSelectorHTML + config.createUI();
             }
             
             const layerNameInput = document.getElementById("layerNameInput");
-            if (layerNameInput) {
-                layerNameInput.value = layer.title || "Untitled Layer";
-            }
+            if (layerNameInput) layerNameInput.value = layer.title || "Untitled Layer";
             
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "none";
@@ -464,19 +491,14 @@ document.addEventListener("DOMContentLoaded", function () {
             symbologyEditorPanel.style.display = "block";
             
             const attributeSelect = document.getElementById("attributeSelect");
-            if (attributeSelect && layer.currentSymbology.field) {
-                attributeSelect.value = layer.currentSymbology.field;
-            }
+            if (attributeSelect && layer.currentSymbology.field) attributeSelect.value = layer.currentSymbology.field;
             
             addEventListenersToControls(); 
-
             updateUIFromValues(layer.currentSymbology);
             updatePreviewFromInputs(); 
 
             const labelAttributeSelect = document.getElementById("labelAttributeSelect");
-            if (labelAttributeSelect && layer.currentSymbology.labelField) {
-                labelAttributeSelect.value = layer.currentSymbology.labelField;
-            }
+            if (labelAttributeSelect && layer.currentSymbology.labelField) labelAttributeSelect.value = layer.currentSymbology.labelField;
         }
 
         function closeSymbologyEditor() {
@@ -492,10 +514,8 @@ document.addEventListener("DOMContentLoaded", function () {
             layerListUl.innerHTML = "";
             [...activeLayers].reverse().forEach(layer => {
                 const li = document.createElement("li");
-                
                 const visibilityIcon = layer.visible ? "esri-icon-visible" : "esri-icon-non-visible";
-                const visibilityTitle = layer.visible ? "Hide Layer" : "Show Layer";
-
+                
                 let methodLabelHtml = "";
                 let methodLabelText = ""; 
                 let editButtonHTML = "";
@@ -511,14 +531,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     editButtonHTML = `<button class="edit-symbology-btn esri-icon-edit" data-layer-id="${layer.id}" title="Edit Symbology"></button>`;
                 }
                 
-                const tooltipText = `${layer.title || 'Layer'} ${methodLabelText}`;
-                
                 li.innerHTML = `
-                    <span title="${tooltipText}">
+                    <span title="${layer.title || 'Layer'} ${methodLabelText}">
                         ${layer.title || 'Layer'} ${methodLabelHtml}
                     </span>
                     <div class="layer-controls">
-                        <button class="toggle-visibility-btn ${visibilityIcon}" data-layer-id="${layer.id}" title="${visibilityTitle}"></button>
+                        <button class="toggle-visibility-btn ${visibilityIcon}" data-layer-id="${layer.id}" title="Toggle Visibility"></button>
                         ${editButtonHTML}
                         <button class="remove-layer-btn esri-icon-trash" data-layer-id="${layer.id}" title="Remove Layer"></button>
                     </div>
@@ -529,18 +547,13 @@ document.addEventListener("DOMContentLoaded", function () {
         
         function updateUIFromValues(values) {
             if (!values) return;
-            
             const setInputValue = (id, value) => {
                 const el = document.getElementById(id);
                 if (el && value !== null && value !== undefined) {
-                    if (el.type === "checkbox") {
-                        el.checked = value;
-                    } else {
-                        el.value = value;
-                    }
+                    if (el.type === "checkbox") el.checked = value;
+                    else el.value = value;
                 }
             };
-            
             setInputValue("labelAttributeSelect", values.labelField);
             setInputValue("startColorPicker", values.rawColors?.start);
             setInputValue("middleColorPicker", values.rawColors?.middle);
@@ -555,7 +568,6 @@ document.addEventListener("DOMContentLoaded", function () {
             setInputValue("shapeSelect", values.shape);
             setInputValue("diameterInput", values.diameter);
             setInputValue("heightAboveGroundInput", values.height);
-            
             setInputValue("singleColorPicker", values.singleColor);
             setInputValue("edgesCheckbox", values.showEdges);
             setInputValue("edgeColorPicker", values.edgeColor); 
@@ -568,12 +580,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 return isNaN(val) ? defaultValue : val;
             };
             const getString = (id, defaultValue = null) => {
-                 const el = sourceElement.querySelector(`#${id}`);
-                 return el ? el.value : defaultValue;
+                 const el = sourceElement.querySelector(`#${id}`); return el ? el.value : defaultValue;
             };
             const getBool = (id, defaultValue = false) => {
-                const el = sourceElement.querySelector(`#${id}`);
-                return el ? el.checked : defaultValue;
+                const el = sourceElement.querySelector(`#${id}`); return el ? el.checked : defaultValue;
             };
 
             const startColor = getString("startColorPicker", "#4575b4");
@@ -581,7 +591,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const endColor = getString("endColorPicker", "#d73027");
 
             const finalStats = stats || focusedLayer?.currentSymbology.stats || { min: 0, max: 0, avg: 0 };
-            
             const attributeSelect = sourceElement.querySelector("#attributeSelect");
 
             return {
@@ -599,8 +608,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 maxSize: getValue("maxSizeInput"),
                 diameter: getValue("diameterInput"),
                 shape: getString("shapeSelect"),
-                
-                // Hodnoty pro budovy
                 singleColor: getString("singleColorPicker", "#ffffff"),
                 showEdges: getBool("edgesCheckbox", false),
                 edgeColor: getString("edgeColorPicker", "#000000") 
@@ -609,24 +616,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
         async function updateStatsAndSymbology() {
             if (!focusedLayer) return;
-
             const attributeSelect = document.getElementById("attributeSelect");
-            if (!attributeSelect) { 
-                handleInputChange();
-                return;
-            }
+            if (!attributeSelect) { handleInputChange(); return; }
 
             const selectedField = attributeSelect.value;
-            
             const stats = await summaryStatistics({ layer: focusedLayer, field: selectedField });
-            
             focusedLayer.currentSymbology.field = selectedField;
             focusedLayer.currentSymbology.stats = stats;
-            
             const labelField = document.getElementById("labelAttributeSelect")?.value;
-            if (labelField) {
-                focusedLayer.currentSymbology.labelField = labelField;
-            }
+            if (labelField) focusedLayer.currentSymbology.labelField = labelField;
 
             updateUIFromValues(focusedLayer.currentSymbology);
             handleInputChange(); 
@@ -634,52 +632,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
         function applySymbology(layerToApply = focusedLayer) {
             if (!layerToApply) return;
-            
             const config = visualizationMethods[layerToApply.methodKey];
             const uiValues = (focusedLayer && layerToApply.id === focusedLayer.id && symbologyEditorPanel.style.display === "block") 
-                ? getUIValues() 
-                : layerToApply.currentSymbology;
-
+                ? getUIValues() : layerToApply.currentSymbology;
             if (!uiValues) return; 
 
-            if (focusedLayer && layerToApply.id === focusedLayer.id) {
-                layerToApply.currentSymbology = uiValues;
-            }
-
-            if (config.createRenderer) {
-                layerToApply.renderer = config.createRenderer(uiValues);
-            }
-           
-            if(config.applyProperties) config.applyProperties(layerToApply, uiValues);
+            if (focusedLayer && layerToApply.id === focusedLayer.id) layerToApply.currentSymbology = uiValues;
+            if (config.createRenderer) layerToApply.renderer = config.createRenderer(uiValues);
+            if (config.applyProperties) config.applyProperties(layerToApply, uiValues);
             
             if (!layerToApply.isContextLayer) {
                 if (uiValues.labelField && uiValues.labelField !== "__none__") {
                     const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
                     const fieldType = field ? field.type : "string"; 
-                    
-                    let labelExpression;
-                    if (["double", "integer", "single", "small-integer"].includes(fieldType)) {
-                        labelExpression = `Text($feature.${uiValues.labelField}, '#,###')`;
-                    } else {
-                        labelExpression = `$feature.${uiValues.labelField}`;
-                    }
-
+                    let labelExpression = ["double", "integer", "single", "small-integer"].includes(fieldType) ? `Text($feature.${uiValues.labelField}, '#,###')` : `$feature.${uiValues.labelField}`;
                     layerToApply.labelingInfo = [{
                         labelExpressionInfo: { expression: labelExpression },
-                        symbol: {
-                            type: "label-3d",
-                            symbolLayers: [{
-                                type: "text",
-                                material: { color: "#E0E0E0" },
-                                halo: { color: [0, 0, 0, 0.7], size: 1 },
-                                font: { size: 10, family: "Open Sans" },
-                            }]
-                        }
+                        symbol: { type: "label-3d", symbolLayers: [{ type: "text", material: { color: "#E0E0E0" }, halo: { color: [0, 0, 0, 0.7], size: 1 }, font: { size: 10, family: "Open Sans" } }] }
                     }];
                 } else {
                     layerToApply.labelingInfo = null; 
                 }
             }
+            updateShareUrl(); 
         }
         
         function handleLayerNameChange() {
@@ -687,7 +662,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const nameInput = document.getElementById("layerNameInput");
             if (nameInput) {
                 focusedLayer.title = nameInput.value || "Untitled Layer";
-                updateLayerList(); 
+                updateLayerList(); updateShareUrl();
             }
         }
 
@@ -710,53 +685,39 @@ document.addEventListener("DOMContentLoaded", function () {
 
         function addEventListenersToControls() {
             const layerNameInput = document.getElementById("layerNameInput");
-            if (layerNameInput) {
-                layerNameInput.addEventListener("input", debouncedNameChangeHandler);
-            }
+            if (layerNameInput) layerNameInput.addEventListener("input", debouncedNameChangeHandler);
 
             document.querySelectorAll('#symbology-controls-container input:not(#layerNameInput)').forEach(input => {
                 input.addEventListener("input", debouncedInputChangeHandler);
             });
-            
             document.querySelectorAll('#symbology-controls-container select:not(#attributeSelect):not(#labelAttributeSelect)').forEach(select => {
                  select.addEventListener("change", handleInputChange);
             });
-
             const attributeSelect = document.getElementById("attributeSelect");
-            if (attributeSelect) {
-                attributeSelect.addEventListener("change", updateStatsAndSymbology);
-            }
+            if (attributeSelect) attributeSelect.addEventListener("change", updateStatsAndSymbology);
             const labelAttributeSelect = document.getElementById("labelAttributeSelect");
-            if (labelAttributeSelect) {
-                labelAttributeSelect.addEventListener("change", handleInputChange); 
-            }
+            if (labelAttributeSelect) labelAttributeSelect.addEventListener("change", handleInputChange); 
         }
         
         loadLayerBtn.addEventListener("click", handleLoadLayer);
         cancelMethodBtn.addEventListener("click", cancelMethodSelection);
         document.getElementById("closeSymbologyBtn").addEventListener("click", closeSymbologyEditor);
-        
         loadBuildingsBtn.addEventListener("click", handleLoadBuildings);
-
         layerListUl.addEventListener("click", (event) => {
             const button = event.target.closest("button");
             if (!button) return;
-
             const layerId = button.dataset.layerId;
             const layer = activeLayers.find(l => l.id === layerId);
             if (!layer) return;
 
-            if (button.classList.contains("remove-layer-btn")) {
-                removeLayer(layerId);
-            } else if (button.classList.contains("edit-symbology-btn")) {
-                openSymbologyEditor(layer);
-            } else if (button.classList.contains("toggle-visibility-btn")) { 
+            if (button.classList.contains("remove-layer-btn")) removeLayer(layerId);
+            else if (button.classList.contains("edit-symbology-btn")) openSymbologyEditor(layer);
+            else if (button.classList.contains("toggle-visibility-btn")) { 
                 layer.visible = !layer.visible;
-                updateLayerList(); 
+                updateLayerList(); updateShareUrl();
             }
         });
 
-        
         function hideAllRightPanels() {
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "none";
@@ -767,60 +728,41 @@ document.addEventListener("DOMContentLoaded", function () {
         
         addThematicLayerBtn.addEventListener("click", () => {
             const isVisible = addLayerPanel.style.display === "block";
-            hideAllRightPanels(); 
-            if (!isVisible) {
-                addLayerPanel.style.display = "block";
-            }
+            hideAllRightPanels(); if (!isVisible) addLayerPanel.style.display = "block";
         });
-
         addBuildingsBtn.addEventListener("click", () => {
             const isVisible = addBuildingsPanel.style.display === "block";
-            hideAllRightPanels();
-            if (!isVisible) {
-                addBuildingsPanel.style.display = "block";
-            }
+            hideAllRightPanels(); if (!isVisible) addBuildingsPanel.style.display = "block";
         });
-
         changeElevationBtn.addEventListener("click", () => {
             const isVisible = elevationPanel.style.display === "block";
-            hideAllRightPanels(); 
-            if (!isVisible) {
-                elevationPanel.style.display = "block";
-            }
+            hideAllRightPanels(); if (!isVisible) elevationPanel.style.display = "block";
         });
 
         defaultElevationRadio.addEventListener("change", () => {
-            if (defaultElevationRadio.checked) {
-                elevationUrlInput.disabled = true;
-            }
+            if (defaultElevationRadio.checked) elevationUrlInput.disabled = true;
         });
-
         customElevationRadio.addEventListener("change", () => {
-            if (customElevationRadio.checked) {
-                elevationUrlInput.disabled = false;
-            }
+            if (customElevationRadio.checked) elevationUrlInput.disabled = false;
         });
 
         applyElevationBtn.addEventListener("click", async () => {
             elevationLoadingMessage.style.display = "block";
             applyElevationBtn.disabled = true;
-
             try {
                 if (defaultElevationRadio.checked) {
                     map.ground = defaultGround;
                 } else if (customElevationRadio.checked) {
                     const url = elevationUrlInput.value;
-                    if (!url) {
-                        alert("Please enter an Elevation Layer URL.");
-                        return;
-                    }
+                    if (!url) { alert("Please enter an Elevation Layer URL."); return; }
                     const newElevationLayer = new ElevationLayer({ url: url });
                     await newElevationLayer.load();
                     map.ground = new Ground({ layers: [newElevationLayer] });
                 }
+                updateShareUrl(); 
             } catch (error) {
                 console.error("Failed to apply elevation:", error);
-                alert("Could not load elevation layer. Please check the URL. Reverting to default.");
+                alert("Could not load elevation layer.");
                 map.ground = defaultGround;
             } finally {
                 elevationLoadingMessage.style.display = "none";
@@ -828,69 +770,69 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
-        document.getElementById("home-link").addEventListener("click", (e) => { e.preventDefault(); location.reload(); });
+        // ===== ZMÌNA: Reload vyèistí URL (odstraní ?state=) =====
+        document.getElementById("home-link").addEventListener("click", (e) => { 
+            e.preventDefault(); 
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.location.href = cleanUrl; 
+        });
+
         const helpButton = document.getElementById("helpButton");
         const helpOverlay = document.getElementById("helpModalOverlay");
         const closeHelpModalBtn = document.getElementById("closeHelpModal");
         
-        const closeHelp = () => {
-            if (helpOverlay) helpOverlay.style.display = "none";
-        };
-        const openHelp = () => {
-            if (helpOverlay) helpOverlay.style.display = "flex";
-        };
-
+        const closeHelp = () => { if (helpOverlay) helpOverlay.style.display = "none"; };
+        const openHelp = () => { if (helpOverlay) helpOverlay.style.display = "flex"; };
         function copyToClipboard(text, element) {
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = element.innerText;
                 element.innerText = "Copied!";
                 element.style.color = "#FFD54F"; 
-                setTimeout(() => {
-                    element.innerText = originalText;
-                    element.style.color = "#f0f0f0"; 
-                }, 1500); 
-            }).catch(err => {
-                console.error('Failed to copy text: ', err);
-            });
+                setTimeout(() => { element.innerText = originalText; element.style.color = "#f0f0f0"; }, 1500); 
+            }).catch(err => { console.error('Failed to copy text: ', err); });
         }
 
         helpButton.addEventListener("click", () => {
             openHelp();
             const demoPoints = document.getElementById("demo-points");
             if (demoPoints) demoPoints.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            
             const demoLines = document.getElementById("demo-lines");
             if (demoLines) demoLines.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            
             const demoPolygons = document.getElementById("demo-polygons");
             if (demoPolygons) demoPolygons.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-            
             const demoBuildings = document.getElementById("demo-buildings");
             if (demoBuildings) demoBuildings.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
-
             const demoElevation = document.getElementById("demo-elevation");
             if (demoElevation) demoElevation.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
         });
 
         closeHelpModalBtn.addEventListener("click", closeHelp);
-        helpOverlay.addEventListener("click", (e) => { 
-            if (e.target === helpOverlay) closeHelp(); 
-        });
+        helpOverlay.addEventListener("click", (e) => { if (e.target === helpOverlay) closeHelp(); });
 
         window.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") {
-                closeHelp();
-                hideAllRightPanels();
-            }
+            if (e.key === "Escape") { closeHelp(); hideAllRightPanels(); }
         });
-        
-        function debounce(fn, d = 100) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), d); }; }
+
+        // Click-away to close panels
+        document.addEventListener("click", function(event) {
+            const rightPanels = [addLayerPanel, methodSelectionPanel, symbologyEditorPanel, elevationPanel, addBuildingsPanel];
+            if (rightPanels.some(p => p.style.display === "block" && p.contains(event.target))) return;
+            const triggerButtons = [addThematicLayerBtn, addBuildingsBtn, changeElevationBtn];
+            if (triggerButtons.some(b => b.contains(event.target))) return;
+            if (event.target.closest(".edit-symbology-btn")) return;
+            hideAllRightPanels();
+        });
 
         view.when(async () => {
             updateLayerList();
-            try {
-                await view.goTo(animationTargetViewpoint, { duration: 5000 });
-            } catch (e) {}
+            
+            const restoredState = await loadStateFromUrl();
+            
+            if (!restoredState) {
+                try {
+                    await view.goTo({ position: { latitude: 48, longitude: 15, z: 15000000 }, tilt: 0, heading: -1 }, { duration: 5000 });
+                } catch (e) {}
+            }
         });
     });
 });
