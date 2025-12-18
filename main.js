@@ -12,8 +12,9 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/widgets/Legend",
         "esri/smartMapping/statistics/summaryStatistics",
         "esri/Viewpoint",
-        "esri/core/reactiveUtils"
-    ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint, reactiveUtils) {
+        "esri/core/reactiveUtils",
+        "esri/geometry/geometryEngine" 
+    ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint, reactiveUtils, geometryEngine) {
 
         // Helper pro debounce
         function debounce(fn, d = 500) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), d); }; }
@@ -211,6 +212,34 @@ document.addEventListener("DOMContentLoaded", function () {
         // Share Link UI
         const shareLinkBtn = document.getElementById("shareLinkBtn");
 
+        // ===== NOVÉ: Funkce pro výpoèet dynamických defaultù podle extentu =====
+        function calculateSmartDefaults(extent, methodKey) {
+            if (!extent) return null; 
+
+            const w = extent.width;
+            const h = extent.height;
+            const scale = Math.max(w, h);
+
+            // Default height logic (5 % rozsahu)
+            let calculatedHeight = Math.round(scale * 0.05);
+            
+            // PRO TYTO METODY VYNUTÍME VÝŠKU 0
+            const groundedMethods = ["vertical", "3D_graduated_columns", "prism", "voxels"];
+            if (groundedMethods.includes(methodKey)) {
+                calculatedHeight = 0;
+            }
+
+            return {
+                height: calculatedHeight,      
+                size: Math.round(scale * 0.025),        
+                minSize: Math.round(scale * 0.02),   
+                maxSize: Math.round(scale * 0.05),    
+                minZ: Math.round(scale * 0.005), 
+                maxZ: Math.round(scale * 0.2),        
+                diameter: Math.round(scale * 0.02)     
+            };
+        }
+
         // ===== LOGIKA SDÍLENÍ STAVU (URL) =====
         
         function updateShareUrl() {
@@ -368,23 +397,65 @@ document.addEventListener("DOMContentLoaded", function () {
             const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
             const defaultField = numericFields.length > 0 ? numericFields[0] : null;
 
+            // ===== NOVÁ LOGIKA PRO EXTENT =====
+            // Zkusíme získat skuteèný extent dat dotazem na server
+            let trueExtent = layer.fullExtent; 
+            try {
+                // queryExtent() spoèítá obálku nad skuteènými daty
+                const extentResult = await layer.queryExtent();
+                if (extentResult && extentResult.count > 0) {
+                    trueExtent = extentResult.extent;
+                    console.log("Using queried extent for smart defaults:", trueExtent);
+                }
+            } catch (e) {
+                console.warn("Query extent failed, falling back to metadata fullExtent:", e);
+            }
+
+            // Pøedáváme 'trueExtent' místo 'layer'
+            const smartDefaults = calculateSmartDefaults(trueExtent, methodKey);
+            // ===================================
+            
+            // Helper pro pøepsání hodnoty v doèasném DIVu
+            const applyDefaultsToUI = (container, defaults) => {
+                if (!defaults) return;
+                const setVal = (id, val) => {
+                    const el = container.querySelector('#' + id);
+                    if (el) el.value = val;
+                };
+                setVal("planeHeightInput", defaults.height);
+                setVal("heightAboveGroundInput", defaults.height);
+                setVal("sizeInput", defaults.size);
+                setVal("minSizeInput", defaults.minSize);
+                setVal("maxSizeInput", defaults.maxSize);
+                setVal("minZOffsetInput", defaults.minZ);
+                setVal("maxZOffsetInput", defaults.maxZ);
+                setVal("diameterInput", defaults.diameter);
+            };
+
             if (defaultField) {
                 const stats = await summaryStatistics({ layer, field: defaultField });
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = config.createUI();
+                
+                applyDefaultsToUI(tempDiv, smartDefaults);
+                
                 layer.currentSymbology = getUIValues(tempDiv, defaultField, stats);
                 layer.currentSymbology.labelField = "__none__";
                 applySymbology(layer); 
             } else {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = config.createUI();
+                
+                applyDefaultsToUI(tempDiv, smartDefaults);
+                
                 layer.currentSymbology = getUIValues(tempDiv, null, {min: 0, max: 0, avg: 0});
                 layer.currentSymbology.labelField = "__none__";
             }
             
             try {
                 await view.whenLayerView(layer);
-                view.goTo(layer.fullExtent, { duration: 1500 });
+                // Použijeme trueExtent i pro zoom, aby to skoèilo pøesnì na data
+                view.goTo(trueExtent, { duration: 1500 });
             } catch (e) { console.error(e); }
             
             openSymbologyEditor(layer);

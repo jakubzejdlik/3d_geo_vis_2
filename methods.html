@@ -1,0 +1,328 @@
+﻿<!DOCTYPE html>
+<html lang="en">    
+    <head>             
+        <meta charset="utf-8" />             
+        <meta name="viewport" content="width=device-width, initial-scale=1" />             
+        <title>3D-Geo-Vis 2.0 - Methodology</title>                  
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" rel="stylesheet">             
+        <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/dark/main.css" />             
+        <link rel="stylesheet" href="methods.css" />    
+        <link rel="icon" href="favicon.png" type="image/png">
+    </head>    
+    <body>             
+        <header>
+            <h1>3D-Geo-Vis 2.0 – Methodology</h1>                     
+            <a href="index.html" class="back-btn">                             
+                <span class="esri-icon-left"></span> Back to App
+            </a>             
+        </header>             
+        <div class="container">                     
+            <aside>                             
+                <nav>
+                    <h3>Introduction</h3>                                     
+                    <ul>                                             
+                        <li><a href="#intro">About</a></li>                                     
+                    </ul>
+                    
+                    <h3>Methods</h3>                                     
+                    <ul>                                             
+                        <li><a href="#horizontal">Horizontal Planes</a></li>                                             
+                        <li><a href="#point-cloud">Point Cloud</a></li>                                             
+                        <li><a href="#graduated-points">3D Surface</a></li>                                             
+                        <li><a href="#vertical">Vertical Planes</a></li>                                             
+                        <li><a href="#graduated-symbols">3D Graduated Symbols</a></li>                                             
+                        <li><a href="#prism">Prism Map</a></li>                                             
+                        <li><a href="#voxels">Voxels</a></li>                                       
+                    </ul>
+                    
+                    <h3>Graphic Variables</h3>                                     
+                    <ul>
+                        <li><a href="#vars-2d">2D Graphic Variables</a></li>
+                        <li><a href="#vars-3d">3D Graphic Variables</a></li>
+                    </ul>                             
+                </nav>                     
+            </aside>                     
+            <main>                             
+                <article id="intro">                                     
+                    <h3 class="method-title">Introduction</h3>                                     
+                    <div class="text-column">                                             
+                        <p>
+                            This page documents the 3D geovisualization methods and graphic variables implemented in the <strong>3D-Geo-Vis 2.0</strong> application and is based on the article                                                       
+                            <span class="citation-trigger" tabindex="0">
+                                Zejdlik & Vozenilek (2025)                                                              
+                                <span class="citation-popup">
+                                    <strong>Reference:</strong><br>                                
+                                    Zejdlik, J., & Vozenilek, V. (2025). Methods of 3D geovisualization of thematic data in the context of graphic variables. International Journal of Cartography, 0(0), 1–16.                                      
+                                    <a href="https://doi.org/10.1080/23729333.2025.2555508" target="_blank">https://doi.org/10.1080/23729333.2025.2555508</a>                                                             
+                                </span>                                                     
+                            </span>.                                              
+                        </p>                                     
+                    </div>                             
+                </article>
+                
+                <div class="part-header">
+                    <h2>3D Geovisualization Methods</h2>                             
+                </div>
+
+                <figure style="margin-bottom: 60px;">
+                    <img src="img/3D_methods.jpg" alt="Graphic representation of seven selected methods" style="object-fit: contain; min-height: auto; max-height: 500px;">
+                    <figcaption>Graphic representation of seven selected methods of 3D geovisualization of thematic data</figcaption>
+                </figure>
+
+                <article id="horizontal">                                     
+                    <h3 class="method-title">Horizontal Planes</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                Horizontal plane is a way of displaying raster spatial data where the entire dataset has  a constant elevation (Z) coordinate and differs only in the way it is displayed, such as the color of the cell. Visualization of 2D planes in the form of static outputs is quite limiting, as they overlap when displaying multiple planes at different height levels. For this reason, it is desirable to use this type of visualization in an interactive environment, which is also necessary for visual analysis and data exploration <span class="citation-trigger" tabindex="0">(Zejdlik and Vozenilek, 2024)<span class="citation-popup">
+                                        <strong>Reference:</strong><br>                                    
+                                        Zejdlik, J., & Vozenilek, V. (2024). Evaluation of 3D geovisualization of volumetric geospatial data in the form of horizontal planes using selected software. Geographia Cassoviensis, 18(1), 5–25.  <a href="https://doi.org/10.33542/GC2024-1-01" target="_blank">https://doi.org/10.33542/GC2024-1-01</a>
+                                    </span>                                                             
+                                </span>.
+                            </p>                                      
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/horizontal.png" alt="Horizontal Planes Visualization">                                        
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="point-cloud">                                     
+                    <h3 class="method-title">Point Cloud</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                A point cloud is a type of discrete visualization where each point is represented by three coordinates. It can be a 2D point cloud, where all points have a constant Z coordinate, or a 3D point cloud, where the Z coordinate is variable. Point clouds can be distributed randomly or in a regular grid. Ideally, the user can dynamically change the size and density of the dots to achieve the best possible visual analysis                                                               
+                                <span class="citation-trigger" tabindex="0">
+                                    (Gautier et al., 2020)                                                                      
+                                    <span class="citation-popup">
+                                        <strong>Reference:</strong><br>                                    
+                                        Gautier, J., Christophe, S., & Brédif, M. (2020). Visualizing 3D climate data in urban 3D models. ISPRS - International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences, XLIII-B4-2020. <a href="https://doi.org/10.5194/isprs-archives-XLIII-B4-2020-781-2020" target="_blank">https://doi.org/10.5194/isprs-archives-XLIII-B4-2020-781-2020</a>
+                                    </span>                                                             
+                                </span>.                                                      
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/point.png" alt="Point Cloud Visualization">                                                     
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="graduated-points">                                     
+                    <h3 class="method-title">3D Surface</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                A 3D surface is a method of continuous visualization usually created by interpolating points from a point cloud. The pixel height (Z coordinate) is variable depending on the value of the phenomenon. 3D surfaces are most often used to represent elevation (digital elevation models), but they can also be used, for example, to represent socio-economic phenomena (so-called social or digital surfaces). Socioeconomic data have different characteristics than data from physical geography. Therefore, it is not enough to use the same methods and just change the data. It is always necessary to know the investigated phenomenon and adapt the visualization method to it                                                               
+                                <span class="citation-trigger" tabindex="0">
+                                    (Jakobi and Nemes Nagy, 2006)                                                                      
+                                    <span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Jakobi, Á., & Nemes Nagy, J. (2006). Digital surface in social geography. Az Eötvös Loránd Tudományegyetem Térképtudományi És Geoinformatikai Tanszékének Évkönyve.                                                                      
+                                    </span>                                                             
+                                </span>.                                                      
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/surface.png" alt="3D Surface">                                                     
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="vertical">                                     
+                    <h3 class="method-title">Vertical Planes</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                Vertical planes are usually located in the middle of urban roads and rendered by extruding vertically the linear geometry of the road network (Figure 5). In order to answer possible occlusion issues, transparency can be applied to the vertical planes 
+                                <span class="citation-trigger" tabindex="0">
+                                    (Gautier et al., 2020a)
+                                    <span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Gautier, J., Christophe, S., & Brédif, M. (2020). Visualizing 3D climate data in urban 3D models. ISPRS - International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences, XLIII-B4-2020. <a href="https://doi.org/10.5194/isprs-archives-XLIII-B4-2020-781-2020" target="_blank">https://doi.org/10.5194/isprs-archives-XLIII-B4-2020-781-2020</a>                                                                      
+                                    </span>                                                             
+                                </span>. 
+                                <span class="citation-trigger" tabindex="0">
+                                    Jedlička et al. (2024)
+                                    <span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Jedlička, K., Andrš, T., Čerba, O., Mildorf, T., Beran, D., Hájek, P., & Kepka, M. (2024). INTERACTIVE CARTOGRAPHY OF AIR QUALITY: A METHOD FOR TRAFFIC POLLUTION ANALYSIS. Proceedings, 9th International Conference on Cartography and GIS, 16-21 June 2024, Nessebar, Bulgaria, 373–385. 
+                                    </span>                                                             
+                                </span> refer to the method as 3D Flow Map, which is based on Flow Map – a method of thematic cartography used for the expression of linear phenomenon with quantitative or qualitative attributes alongside the geometry of the line.                                                      
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/vertical.png" alt="Vertical Planes">                                                     
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="graduated-symbols">                                     
+                    <h3 class="method-title">3D Graduated Symbols</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                This method is based on 2D graduated symbols method used in thematic maps. Symbols can take many forms, from 3D bars to spheres to pie charts, while the size of these elements depends on the value (eg column height, sphere diameter). Testing suitable representations of quantitative spatial data in 3D virtual environments using 3D graduated symbols was dealt with by <span class="citation-trigger" tabindex="0">Bleisch (2011)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Bleisch, S. (2011). Toward Appropriate Representations of Quantitative Data in Virtual Environments. Cartographica, 46, 252–261. <a href="https://doi.org/10.3138/carto.46.4.252" target="_blank">https://doi.org/10.3138/carto.46.4.252</a> 
+                                    </span>                                                             
+                                </span>. Six potentially appropriate proportional symbols for the display of quantitative data in virtual environments were experimentally tested: 2D bars, 3D bars, and 2D circles, with and without reference frames indicating the largest possible value <span class="citation-trigger" tabindex="0">(Bleisch, 2011)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Bleisch, S. (2011). Toward Appropriate Representations of Quantitative Data in Virtual Environments. Cartographica, 46, 252–261. <a href="https://doi.org/10.3138/carto.46.4.252" target="_blank">https://doi.org/10.3138/carto.46.4.252</a> 
+                                    </span>                                                             
+                                </span>. <span class="citation-trigger" tabindex="0">Stoter et al. (2008)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Stoter, J., de Kluijver, H., & Kurakula, V. (2008). 3D noise mapping in urban areas. International Journal of Geographical Information Science, 22(8), 907–924. 
+ <a href="https://doi.org/10.1080/13658810701739039" target="_blank">https://doi.org/10.1080/13658810701739039</a> 
+                                    </span>                                                             
+                                </span> used 3D graduated symbols to visualize the noise level using so-called virtual microphones. A virtual microphone, specified with x, y, z coordinates, is a point that reports what the noise level would be at a certain location under given circumstances.                                                      
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/graduated1.png" alt="3D Graduated Symbols">                                                     
+                            </figure>                                                         
+                            <figure>                                                             
+                                <img src="img/graduated2.png" alt="3D Graduated Symbols">                                                     
+                            </figure>                                         
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="prism">                                     
+                    <h3 class="method-title">Prism Map</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                A prism map is a 3D choropleth map with extruded height to encode a numerical attribute. Prism maps are predominantly used for visual impact, and the unfamiliarity with prism maps hampers their understanding <span class="citation-trigger" tabindex="0">(Field, 2018)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Field, K. (2018). Cartography. (1st ed.). Esri Press. ISBN 978-1-58948-439-9 
+                                    </span>                                                             
+                                </span>. Height (the visual variable used by prism maps) is far more accurate for interpreting associated quantitative values than brightness (the visual variable commonly used by choropleth maps), but perspective foreshortening and oblique viewing angles can result in distortion and excessive occlusion in prism maps <span class="citation-trigger" tabindex="0">(Cleveland and McGill, 1984)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Cleveland, W. S., & McGill, R. (1984). Graphical Perception: Theory, Experimentation, and Application to the Development of Graphical Methods. Journal of the American Statistical Association, 79(387), 531–554. 
+ <a href="https://doi.org/10.1080/01621459.1984.10478080" target="_blank">https://doi.org/10.1080/01621459.1984.10478080</a> 
+                                    </span>                                                             
+                                </span>.                                                       
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/prism.png" alt="Prism Map">                                                     
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+                
+                <article id="voxels">                                     
+                    <h3 class="method-title">Voxels</h3>                                     
+                    <div class="content-layout">                                             
+                        <div class="text-column">                                                     
+                            <p>
+                                In geovisualization using voxels, the data is represented by blocks with different heights depending on their values. It has common elements with a 3D graduated symbols and prism map. Unlike 3D graduated symbols, in the case of voxels, adjacent blocks (voxels) are connected to each other, and unlike a prism map, all polygons have the same size. <span class="citation-trigger" tabindex="0">Rae (2016)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        Rae, A. (2016). The Global Human Settlement Layer: An amazing new global population dataset. <a href="http://www.statsmapsnpix.com/2016/10/the-global-human-settlement-layer.html" target="_blank">http://www.statsmapsnpix.com/2016/10/the-global-human-settlement-layer.html</a> 
+                                    </span>                                                             
+                                </span> used The Global Human Settlement Layer data to represent population in selected cities using voxels. His approach was applied in 2018 by The Pudding to create an interactive web map application, using the same dataset to represent population for the entire world <span class="citation-trigger" tabindex="0">(The Pudding, 2024)<span class="citation-popup">
+                                        <strong>References:</strong><br>                                    
+                                        The Pudding. (2024). Human Terrain. <a href="https://pudding.cool/2018/10/city_3d" target="_blank">https://pudding.cool/2018/10/city_3d</a> 
+                                    </span>                                                             
+                                </span>.                                                     
+                            </p>                                             
+                        </div>                                             
+                        <div class="image-column">                                                     
+                            <figure>                                                             
+                                <img src="img/voxels.png" alt="Voxels">                                                     
+                            </figure>                                             
+                        </div>                                     
+                    </div>                             
+                </article>
+
+                <div class="part-header">                
+                    <h2>Graphic Variables</h2>                             
+                </div>
+                
+                <figure style="margin-bottom: 60px;">
+                    <img src="img/graphic_variables.jpg" alt="Graphic variables selected for evaluation" style="object-fit: contain; min-height: auto; max-height: 300px;">
+                    <figcaption>Graphic variables selected for evaluation of methods of 3D geovisualization of thematic data</figcaption>
+                </figure>
+
+                <article id="graphic-variables-text">
+                    <div class="text-column" style="max-width: 100%;">
+                        <h3 id="vars-2d" class="method-title">2D Graphic Variables</h3>
+                        <p>
+                            Graphic or visual variables describe the graphic dimensions in which a map or other visualization can be changed to encode information. Graphic variables are differences in map elements perceived by the human eye. Regardless of the type of map, these are basic ways of distinguishing graphic symbols <span class="citation-trigger" tabindex="0">(Axis Maps, 2023)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Axis Maps. (2023). Visual Variables. Cartography Guide - A Short, Friendly Guide to Basic Principles of Map Design. <a href="https://www.axismaps.com//guide/visual-variables" target="_blank">https://www.axismaps.com//guide/visual-variables</a>
+                            </span></span>. For example, <span class="citation-trigger" tabindex="0">Garlandini and Fabrikant (2009)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Garlandini, S., & Fabrikant, S. I. (2009). Evaluating the Effectiveness and Efficiency of Visual Variables for Geographic Information Visualization. In K. S. Hornsby, C. Claramunt, M. Denis, & G. Ligozat (Eds.), Spatial Information Theory (pp. 195–211). Springer. <a href="https://doi.org/10.1007/978-3-642-03832-7_12" target="_blank">https://doi.org/10.1007/978-3-642-03832-7_12</a>
+                            </span></span> dealt with the evaluation of the effectiveness and efficiency of visual variables for the visualization of geographic information. Visual variables were originally described by the French cartographer Jacques Bertin (1918–2010) in the book Sémiologie Graphique (Semiology of Graphics) in the original 1967 edition, revised in 1983 <span class="citation-trigger" tabindex="0">(Roth, 2017)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Roth, R. E. (2017). Visual Variables. In International Encyclopedia of Geography (pp. 1–11). John Wiley & Sons, Ltd. <a href="https://doi.org/10.1002/9781118786352.wbieg0761" target="_blank">https://doi.org/10.1002/9781118786352.wbieg0761</a>
+                            </span></span>. The original so-called "retinal variables" <span class="citation-trigger" tabindex="0">(Bertin, 1967)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Bertin, J. (1967). Sémiologie graphique: Les diagrammes, les réseaux, les cartes. Gauthier-Villars.
+                            </span></span> included:
+                        </p>
+                        <ul>
+                            <li><strong>position</strong> (the location of a symbol on the map);</li>
+                            <li><strong>size</strong> (the relative dimension of a symbol);</li>
+                            <li><strong>shape</strong> (the geometric form of a symbol);</li>
+                            <li><strong>color value</strong> (variation from light to dark);</li>
+                            <li><strong>color hue</strong> (variation in color type);</li>
+                            <li><strong>orientation</strong> (directional rotation of a symbol);</li>
+                            <li><strong>texture/pattern</strong> (surface fill variation).</li>
+                        </ul>
+                
+                        <p>This list was then gradually expanded by other cartographers <span class="citation-trigger" tabindex="0">(MacEachren, 2004<span class="citation-popup">
+                            <strong>Reference:</strong><br>
+                            MacEachren, A. M. (2004). How Maps Work: Representation, Visualization, and Design (1st edition). The Guilford Press.
+                        </span></span>; <span class="citation-trigger" tabindex="0">Morrison, 1974<span class="citation-popup">
+                            <strong>Reference:</strong><br>
+                            Morrison, J. L. (1974). A theoretical framework for cartographic generalization with the emphasis on the process of symbolization. International Yearbook of Cartography, 14(1974), 115–127.
+                        </span></span>; <span class="citation-trigger" tabindex="0">Roth, 2017)<span class="citation-popup">
+                            <strong>Reference:</strong><br>
+                            Roth, R. E. (2017). Visual Variables. In International Encyclopedia of Geography (pp. 1–11). John Wiley & Sons, Ltd. <a href="https://doi.org/10.1002/9781118786352.wbieg0761" target="_blank">https://doi.org/10.1002/9781118786352.wbieg0761</a>
+                        </span></span>:</p>
+                        <ul>
+                            <li><strong>color saturation</strong> (the intensity of color);</li>
+                            <li><strong>arrangement</strong> (the spatial organization of elements);</li>
+                            <li><strong>crispness/fuzziness</strong> (sharp vs. blurred boundaries);</li>
+                            <li><strong>resolution</strong> (the level of detail);</li>
+                            <li><strong>transparency</strong> (the degree of opacity).</li>
+                        </ul>
+                
+                        <h3 id="vars-3d" class="method-title" style="margin-top: 40px;">3D Graphic Variables</h3>
+                        <p>
+                            In addition, the 3D environment allows the evaluation of other graphic variables, such as perspective, camera, lighting, shading, atmospheric effects <span class="citation-trigger" tabindex="0">(Krejčí, 2018)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Krejčí, M. (2018). Dynamické grafické proměnné ve 3D mapách [Diplomová práce, Masarykova univerzita, Přírodovědecká fakulta]. <a href="https://theses.cz/id/35lr4j/" target="_blank">https://theses.cz/id/35lr4j/</a>
+                            </span></span>, height, extrusion, object surface (pattern, shading), light emission <span class="citation-trigger" tabindex="0">(Limberger et al., 2023)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Limberger, D., Scheibel, W., Döllner, J., & Trapp, M. (2023). Visual variables and configuration of software maps. Journal of Visualization, 26(1), 249–274. <a href="https://doi.org/10.1007/s12650-022-00868-1" target="_blank">https://doi.org/10.1007/s12650-022-00868-1</a>
+                            </span></span> or fog <span class="citation-trigger" tabindex="0">(Vetter, 2023)<span class="citation-popup">
+                                <strong>Reference:</strong><br>
+                                Vetter, M. (2023). The usage of “fog” as a visual variable in 3D-cartographic virtual reality environments. Abstracts of the ICA, 6, 1–2. <a href="https://doi.org/10.5194/ica-abs-6-263-2023" target="_blank">https://doi.org/10.5194/ica-abs-6-263-2023</a>
+                            </span></span>. For the purposes of this paper, four 3D graphic variables were selected to evaluate 3D geovisualization methods, namely:
+                        </p>
+                        <ul>
+                            <li><strong>height</strong> (vertical dimension of the symbol);</li>
+                            <li><strong>extrusion</strong> (expansion of a 2D object into the third dimension);</li>
+                            <li><strong>camera / point of view</strong> (the place from which the user looks at the object or scene);</li>
+                            <li><strong>perspective</strong> (the way an object or scene is rendered to appear realistic in terms of depth and space).</li>
+                        </ul>
+                    </div>
+                </article>                     
+            </main>             
+        </div>    
+    </body>
+</html>
