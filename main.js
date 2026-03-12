@@ -16,11 +16,15 @@ document.addEventListener("DOMContentLoaded", function () {
         "esri/geometry/geometryEngine" 
     ], function (Map, SceneView, FeatureLayer, SceneLayer, Ground, ElevationLayer, Home, BasemapGallery, Expand, Legend, summaryStatistics, Viewpoint, reactiveUtils, geometryEngine) {
 
-        // Helper pro debounce
+        // --- HELPER FUNCTIONS ---
+        // Debounce function to limit the rate at which a function fires (useful for sliders and camera movement)
         function debounce(fn, d = 500) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), d); }; }
 
+        // Common UI snippet for color ramps used across multiple visualization methods
         const commonColorUI = `<h2>Color Ramp</h2><div class="color-pickers-wrapper"><input type="color" id="startColorPicker" value="#4575b4"><input type="color" id="middleColorPicker" value="#ffffbf"><input type="color" id="endColorPicker" value="#d73027"></div><div id="colorRampPreview"></div>`;
         
+        // --- VISUALIZATION METHODS CONFIGURATION ---
+        // Object containing logic for UI generation, ArcGIS renderer creation, and layer property application for each method
         const visualizationMethods = {
             horizontal: {
                 title: "Horizontal Planes",
@@ -156,10 +160,12 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         };
 
+        // --- GLOBAL STATE ---
         let activeLayers = [];
-        let focusedLayer = null;
-        let pendingLayer = null; 
+        let focusedLayer = null; // Layer currently selected in the Symbology Editor
+        let pendingLayer = null; // Layer loaded but waiting for method selection
         
+        // --- MAP & SCENE INITIALIZATION ---
         const defaultGround = new Ground({ layers: [new ElevationLayer({ url: "//elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer" })] });
         const map = new Map({ basemap: "topo-vector", ground: defaultGround });
         
@@ -179,7 +185,8 @@ document.addEventListener("DOMContentLoaded", function () {
         view.ui.add(new Expand({ view, content: new BasemapGallery({ view }), expandIconClass: "esri-icon-basemap" }), "top-left");
         view.ui.add(new Expand({ view: view, content: new Legend({ view }), expandIconClass: "esri-icon-legend" }), "bottom-left");
 
-        // UI Reference
+        // --- DOM ELEMENT REFERENCES ---
+        // Layer UI
         const addLayerPanel = document.getElementById("addLayerPanel");
         const methodSelectionPanel = document.getElementById("methodSelectionPanel");
         const symbologyEditorPanel = document.getElementById("symbologyEditorPanel");
@@ -212,7 +219,12 @@ document.addEventListener("DOMContentLoaded", function () {
         // Share Link UI
         const shareLinkBtn = document.getElementById("shareLinkBtn");
 
-        // ===== NOVÉ: Funkce pro výpoèet dynamických defaultù podle extentu =====
+        // --- SMART DEFAULTS LOGIC ---
+        /**
+         * Calculates proportional default visualization values (height, size, offsets) 
+         * based on the actual geographic extent of the loaded data.
+         * Ensures that visual markers are appropriately sized whether the data spans a city or a continent.
+         */
         function calculateSmartDefaults(extent, methodKey) {
             if (!extent) return null; 
 
@@ -220,10 +232,10 @@ document.addEventListener("DOMContentLoaded", function () {
             const h = extent.height;
             const scale = Math.max(w, h);
 
-            // Default height logic (5 % rozsahu)
+            // Baseline logic: Use roughly 5% of the spatial extent scale
             let calculatedHeight = Math.round(scale * 0.05);
             
-            // PRO TYTO METODY VYNUTÍME VÝŠKU 0
+            // Force 0 height for methods that are naturally anchored to the ground
             const groundedMethods = ["vertical", "3D_graduated_columns", "prism", "voxels"];
             if (groundedMethods.includes(methodKey)) {
                 calculatedHeight = 0;
@@ -240,8 +252,9 @@ document.addEventListener("DOMContentLoaded", function () {
             };
         }
 
-        // ===== LOGIKA SDÍLENÍ STAVU (URL) =====
+        // --- URL STATE SHARING (DEEP LINKING) ---
         
+        // Encodes the current application state (layers, UI parameters, camera) into a base64 URL parameter
         function updateShareUrl() {
             let currentElevationUrl = null;
             if (customElevationRadio.checked && map.ground.layers.length > 0) {
@@ -267,6 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
             window.history.replaceState({}, '', newUrl);
         }
 
+        // Decodes and restores application state from URL parameters upon initial load
         async function loadStateFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const stateParam = params.get('state');
@@ -275,12 +289,12 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 const decodedState = JSON.parse(decodeURIComponent(escape(atob(stateParam))));
                 
-                // 1. Obnova kamery
+                // 1. Restore Camera Position
                 if (decodedState.camera) {
                     view.camera = decodedState.camera;
                 }
 
-                // 2. Obnova výškopisu
+                // 2. Restore Elevation Settings
                 if (decodedState.elevation) {
                      const newElevationLayer = new ElevationLayer({ url: decodedState.elevation });
                      await newElevationLayer.load();
@@ -290,7 +304,7 @@ document.addEventListener("DOMContentLoaded", function () {
                      elevationUrlInput.disabled = false;
                 }
 
-                // 3. Obnova vrstev
+                // 3. Restore and Configure All Active Layers
                 if (decodedState.layers && Array.isArray(decodedState.layers)) {
                     for (const lData of decodedState.layers) {
                         let layer;
@@ -323,11 +337,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 return true; 
 
             } catch (e) {
-                console.error("Chyba pøi naèítání sdíleného odkazu:", e);
+                console.error("Error loading state from URL:", e);
                 return false;
             }
         }
 
+        // Copy current deep link to clipboard
         if (shareLinkBtn) {
             shareLinkBtn.addEventListener("click", () => {
                 navigator.clipboard.writeText(window.location.href);
@@ -335,11 +350,13 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
 
+        // Update URL state implicitly when camera stops moving
         view.watch("camera", debounce(() => updateShareUrl(), 1000));
 
-        // ===== KONEC LOGIKY SDÍLENÍ =====
 
-
+        // --- THEMATIC DATA LOADING LOGIC ---
+        
+        // 1. Fetch layer from URL and check geometry type
         async function handleLoadLayer() {
             const url = layerUrlInput.value;
             if (!url) { alert("Please enter a Feature Layer URL."); return; }
@@ -361,6 +378,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
 
+        // 2. Display applicable visualization methods based on geometry
         function showMethodSelection(geometryType) {
             methodButtonsContainer.innerHTML = ""; 
             const compatibleMethods = Object.keys(visualizationMethods).filter(key => visualizationMethods[key].compatibleGeometry.includes(geometryType));
@@ -379,6 +397,7 @@ document.addEventListener("DOMContentLoaded", function () {
             methodSelectionPanel.style.display = "block";
         }
 
+        // 3. Apply method, calculate defaults, and add to map
         async function finalizeAddLayer(methodKey) {
             if (!pendingLayer) return;
             const layer = pendingLayer;
@@ -397,11 +416,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const numericFields = layer.fields.filter(f => ["double", "integer", "single", "small-integer"].includes(f.type)).map(f => f.name);
             const defaultField = numericFields.length > 0 ? numericFields[0] : null;
 
-            // ===== NOVÁ LOGIKA PRO EXTENT =====
-            // Zkusíme získat skuteèný extent dat dotazem na server
+            // Determine true extent of the dataset for smart default calculation
             let trueExtent = layer.fullExtent; 
             try {
-                // queryExtent() spoèítá obálku nad skuteènými daty
                 const extentResult = await layer.queryExtent();
                 if (extentResult && extentResult.count > 0) {
                     trueExtent = extentResult.extent;
@@ -411,11 +428,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.warn("Query extent failed, falling back to metadata fullExtent:", e);
             }
 
-            // Pøedáváme 'trueExtent' místo 'layer'
             const smartDefaults = calculateSmartDefaults(trueExtent, methodKey);
-            // ===================================
             
-            // Helper pro pøepsání hodnoty v doèasném DIVu
+            // Helper to inject computed defaults into a temporary UI container before fetching standard values
             const applyDefaultsToUI = (container, defaults) => {
                 if (!defaults) return;
                 const setVal = (id, val) => {
@@ -432,6 +447,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 setVal("diameterInput", defaults.diameter);
             };
 
+            // Fetch statistics and apply initial symbology
             if (defaultField) {
                 const stats = await summaryStatistics({ layer, field: defaultField });
                 const tempDiv = document.createElement('div');
@@ -454,7 +470,7 @@ document.addEventListener("DOMContentLoaded", function () {
             
             try {
                 await view.whenLayerView(layer);
-                // Použijeme trueExtent i pro zoom, aby to skoèilo pøesnì na data
+                // Zoom smoothly to the accurate dataset extent
                 view.goTo(trueExtent, { duration: 1500 });
             } catch (e) { console.error(e); }
             
@@ -470,7 +486,7 @@ document.addEventListener("DOMContentLoaded", function () {
             addLayerPanel.style.display = "block";
         }
 
-        // ===== LOGIKA PRO 3D BUDOVY =====
+        // --- 3D BUILDINGS (CONTEXT LAYER) LOGIC ---
         async function handleLoadBuildings() {
             const url = buildingsUrlInput.value;
             if (!url) { alert("Please enter a Scene Layer URL."); return; }
@@ -481,6 +497,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 const layer = new SceneLayer({ url: url });
                 await layer.load();
                 if (!layer.title) layer.title = "3D Buildings";
+                
+                // Flag as context layer to alter UI behavior (no attributes/stats)
                 layer.isContextLayer = true; 
                 layer.methodKey = "building_context"; 
                 layer.currentSymbology = {
@@ -512,7 +530,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
         
-        // ===== SPOLEÈNÉ FUNKCE =====
+        // --- COMMON LAYER & UI FUNCTIONS ---
+        
         function removeLayer(layerId) {
             const layerToRemove = activeLayers.find(l => l.id === layerId);
             if (!layerToRemove) return;
@@ -523,6 +542,7 @@ document.addEventListener("DOMContentLoaded", function () {
             updateShareUrl(); 
         }
 
+        // Populates and displays the symbology editor panel for a specific layer
         async function openSymbologyEditor(layer) {
             focusedLayer = layer;
             if (!layer) { closeSymbologyEditor(); return; }
@@ -531,6 +551,7 @@ document.addEventListener("DOMContentLoaded", function () {
             symbologyPanelTitle.innerText = `Symbology (${config.title})`;
             let renameHTML = `<h2>Layer Name</h2><input type="text" id="layerNameInput">`;
             
+            // Generate different UI depending on whether it's a context layer (buildings) or thematic data
             if (layer.isContextLayer) {
                 symbologyControlsContainer.innerHTML = renameHTML + config.createUI();
             } else {
@@ -555,6 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const layerNameInput = document.getElementById("layerNameInput");
             if (layerNameInput) layerNameInput.value = layer.title || "Untitled Layer";
             
+            // Toggle panel visibility
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "none";
             elevationPanel.style.display = "none"; 
@@ -577,6 +599,7 @@ document.addEventListener("DOMContentLoaded", function () {
             symbologyEditorPanel.style.display = "none";
         }
 
+        // Renders the list of active layers in the bottom right panel
         function updateLayerList() {
             if (activeLayers.length === 0) {
                 layerListUl.innerHTML = `<p class="placeholder-text">Use the buttons in the top bar to add thematic data, add 3D buildings, or change the elevation layer.</p>`;
@@ -616,6 +639,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
         
+        // Maps state values back to HTML inputs
         function updateUIFromValues(values) {
             if (!values) return;
             const setInputValue = (id, value) => {
@@ -644,6 +668,7 @@ document.addEventListener("DOMContentLoaded", function () {
             setInputValue("edgeColorPicker", values.edgeColor); 
         }
 
+        // Extracts all user configuration from HTML inputs into a state object
         function getUIValues(sourceElement = symbologyControlsContainer, field = null, stats = null) {
             const getValue = (id, isFloat = false, defaultValue = null) => {
                 const input = sourceElement.querySelector(`#${id}`); if (!input) return defaultValue;
@@ -685,6 +710,7 @@ document.addEventListener("DOMContentLoaded", function () {
             };
         }
 
+        // Triggered when user changes the target visualization attribute
         async function updateStatsAndSymbology() {
             if (!focusedLayer) return;
             const attributeSelect = document.getElementById("attributeSelect");
@@ -701,6 +727,7 @@ document.addEventListener("DOMContentLoaded", function () {
             handleInputChange(); 
         }
 
+        // Re-generates renderers based on current UI config and pushes updates to map
         function applySymbology(layerToApply = focusedLayer) {
             if (!layerToApply) return;
             const config = visualizationMethods[layerToApply.methodKey];
@@ -712,6 +739,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (config.createRenderer) layerToApply.renderer = config.createRenderer(uiValues);
             if (config.applyProperties) config.applyProperties(layerToApply, uiValues);
             
+            // Handle 3D labeling logic
             if (!layerToApply.isContextLayer) {
                 if (uiValues.labelField && uiValues.labelField !== "__none__") {
                     const field = layerToApply.fields.find(f => f.name === uiValues.labelField);
@@ -751,9 +779,11 @@ document.addEventListener("DOMContentLoaded", function () {
             colorRampPreview.style.background = `linear-gradient(to right, ${colors.join(", ")})`;
         }
 
+        // Set up local UI debouncers
         const debouncedInputChangeHandler = debounce(handleInputChange, 50);
         const debouncedNameChangeHandler = debounce(handleLayerNameChange, 250); 
 
+        // --- EVENT LISTENERS BINDING ---
         function addEventListenersToControls() {
             const layerNameInput = document.getElementById("layerNameInput");
             if (layerNameInput) layerNameInput.addEventListener("input", debouncedNameChangeHandler);
@@ -774,6 +804,8 @@ document.addEventListener("DOMContentLoaded", function () {
         cancelMethodBtn.addEventListener("click", cancelMethodSelection);
         document.getElementById("closeSymbologyBtn").addEventListener("click", closeSymbologyEditor);
         loadBuildingsBtn.addEventListener("click", handleLoadBuildings);
+        
+        // Event delegation for dynamically generated layer list controls
         layerListUl.addEventListener("click", (event) => {
             const button = event.target.closest("button");
             if (!button) return;
@@ -789,6 +821,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
+        // Panel toggling behavior
         function hideAllRightPanels() {
             addLayerPanel.style.display = "none";
             methodSelectionPanel.style.display = "none";
@@ -841,19 +874,21 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 
-        // ===== ZMÌNA: Reload vyèistí URL (odstraní ?state=) =====
+        // Clear deep link URL variables upon clicking the home button
         document.getElementById("home-link").addEventListener("click", (e) => { 
             e.preventDefault(); 
             const cleanUrl = window.location.origin + window.location.pathname;
             window.location.href = cleanUrl; 
         });
 
+        // --- HELP MODAL LOGIC ---
         const helpButton = document.getElementById("helpButton");
         const helpOverlay = document.getElementById("helpModalOverlay");
         const closeHelpModalBtn = document.getElementById("closeHelpModal");
         
         const closeHelp = () => { if (helpOverlay) helpOverlay.style.display = "none"; };
         const openHelp = () => { if (helpOverlay) helpOverlay.style.display = "flex"; };
+        
         function copyToClipboard(text, element) {
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = element.innerText;
@@ -865,6 +900,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         helpButton.addEventListener("click", () => {
             openHelp();
+            // Bind copy-to-clipboard functionality to demo link snippets
             const demoPoints = document.getElementById("demo-points");
             if (demoPoints) demoPoints.onclick = (e) => copyToClipboard(e.target.innerText, e.target);
             const demoLines = document.getElementById("demo-lines");
@@ -884,7 +920,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (e.key === "Escape") { closeHelp(); hideAllRightPanels(); }
         });
 
-        // Click-away to close panels
+        // Click-away detection to close side panels
         document.addEventListener("click", function(event) {
             const rightPanels = [addLayerPanel, methodSelectionPanel, symbologyEditorPanel, elevationPanel, addBuildingsPanel];
             if (rightPanels.some(p => p.style.display === "block" && p.contains(event.target))) return;
@@ -894,11 +930,13 @@ document.addEventListener("DOMContentLoaded", function () {
             hideAllRightPanels();
         });
 
+        // --- APPLICATION LAUNCH ---
         view.when(async () => {
             updateLayerList();
             
             const restoredState = await loadStateFromUrl();
             
+            // Go to default viewpoint if no state was loaded from URL
             if (!restoredState) {
                 try {
                     await view.goTo({ position: { latitude: 48, longitude: 15, z: 15000000 }, tilt: 0, heading: -1 }, { duration: 5000 });
