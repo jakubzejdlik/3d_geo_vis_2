@@ -263,7 +263,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const state = {
                 layers: activeLayers.map(l => ({
-                    url: l.url,
+                    url: l.originalInputUrl || l.url,
                     title: l.title,
                     methodKey: l.methodKey,
                     symbology: l.currentSymbology,
@@ -315,6 +315,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         }
                         
                         layer.title = lData.title;
+                        layer.originalInputUrl = lData.url;
                         
                         try {
                             await layer.load();
@@ -365,6 +366,7 @@ document.addEventListener("DOMContentLoaded", function () {
             pendingLayer = null; 
             try {
                 pendingLayer = new FeatureLayer({ url: url, outFields: ["*"] });
+                pendingLayer.originalInputUrl = url;
                 await pendingLayer.load();
                 if (!pendingLayer.title) pendingLayer.title = "New Layer";
                 showMethodSelection(pendingLayer.geometryType);
@@ -495,6 +497,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             try {
                 const layer = new SceneLayer({ url: url });
+                layer.originalInputUrl = url;
                 await layer.load();
                 if (!layer.title) layer.title = "3D Buildings";
                 
