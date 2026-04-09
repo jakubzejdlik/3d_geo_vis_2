@@ -160,6 +160,19 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         };
 
+        function generatePopupTemplate(layer, title) {
+            if (!layer.fields) return null;
+            
+            const allFieldInfos = layer.fields
+                .filter(field => !["oid", "global-id", "geometry"].includes(field.type))
+                .map(field => ({ fieldName: field.name, label: field.alias || field.name }));
+                
+            return { 
+                title: title, 
+                content: [{ type: "fields", fieldInfos: allFieldInfos }] 
+            };
+        }
+
         // --- GLOBAL STATE ---
         let activeLayers = [];
         let focusedLayer = null; // Layer currently selected in the Symbology Editor
@@ -323,7 +336,12 @@ document.addEventListener("DOMContentLoaded", function () {
                             layer.methodKey = lData.methodKey;
                             layer.currentSymbology = lData.symbology;
                             layer.visible = lData.visible;
-                            if (lData.isContext) layer.isContextLayer = true;
+                            if (lData.isContext) {
+                                layer.isContextLayer = true;
+                            } else {
+                                const config = visualizationMethods[lData.methodKey];
+                                layer.popupTemplate = generatePopupTemplate(layer, config ? config.title : layer.title);
+                            }
 
                             map.add(layer);
                             activeLayers.push(layer);
@@ -406,10 +424,7 @@ document.addEventListener("DOMContentLoaded", function () {
             pendingLayer = null; 
             const config = visualizationMethods[methodKey];
             
-            const allFieldInfos = layer.fields.filter(field => !["oid", "global-id", "geometry"].includes(field.type))
-                .map(field => ({ fieldName: field.name, label: field.alias || field.name }));
-            
-            layer.popupTemplate = { title: config.title, content: [{ type: "fields", fieldInfos: allFieldInfos }] };
+            layer.popupTemplate = generatePopupTemplate(layer, config.title);
             layer.methodKey = methodKey;
             
             map.add(layer);
