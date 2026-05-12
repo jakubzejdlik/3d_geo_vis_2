@@ -937,6 +937,18 @@ document.addEventListener("DOMContentLoaded", function () {
         window.addEventListener("keydown", (e) => {
             if (e.key === "Escape") { closeHelp(); hideAllRightPanels(); }
         });
+        
+        // --- FEEDBACK ---
+        const feedbackBtn = document.getElementById("feedbackBtn");
+        if (feedbackBtn) {
+            feedbackBtn.addEventListener("click", () => {
+                const email = "jakub.zejdlik@upol.cz";
+                const subject = encodeURIComponent("Feedback: 3D-Geo-Vis 2.0");
+                const body = encodeURIComponent("Hello Jakub,\n\nHere is my feedback on 3D-Geo-Vis 2.0:\n\n");
+                
+                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+            });
+        }
 
         // Click-away detection to close side panels
         document.addEventListener("click", function(event) {
